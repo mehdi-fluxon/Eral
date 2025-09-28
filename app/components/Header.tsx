@@ -37,6 +37,9 @@ export default function Header() {
               <Link href="/analytics" className="text-gray-700 hover:text-indigo-600 transition-colors font-medium">
                 Analytics
               </Link>
+              <Link href="/ai-agent" className="text-gray-700 hover:text-indigo-600 transition-colors font-medium">
+                🤖 AI Agent
+              </Link>
               <Link href="/api-docs" className="text-gray-700 hover:text-indigo-600 transition-colors font-medium">
                 API Docs
               </Link>
@@ -79,6 +82,9 @@ export default function Header() {
               </Link>
               <Link href="/analytics" className="block px-3 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-md transition-colors">
                 Analytics
+              </Link>
+              <Link href="/ai-agent" className="block px-3 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-md transition-colors">
+                🤖 AI Agent
               </Link>
               <Link href="/api-docs" className="block px-3 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-md transition-colors">
                 API Docs

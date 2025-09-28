@@ -52,16 +52,92 @@ export async function POST(
       )
     }
 
-    const note = await prisma.note.create({
-      data: {
-        contactId,
-        teamMemberId,
-        content
-      },
-      include: {
-        teamMember: true
+    // Create note and update contact's lastTouchDate in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the note
+      const note = await tx.note.create({
+        data: {
+          contactId,
+          teamMemberId,
+          content
+        },
+        include: {
+          teamMember: true
+        }
+      })
+
+      // Update contact's lastTouchDate and recalculate nextReminderDate
+      const contact = await tx.contact.findUnique({
+        where: { id: contactId }
+      })
+
+      if (contact) {
+        const now = new Date()
+        const nextReminderDate = new Date(now)
+        
+        // Calculate next reminder based on cadence
+        switch (contact.cadence) {
+          case '1_DAY':
+            nextReminderDate.setDate(nextReminderDate.getDate() + 1)
+            break
+          case '2_DAYS':
+            nextReminderDate.setDate(nextReminderDate.getDate() + 2)
+            break
+          case '3_DAYS':
+            nextReminderDate.setDate(nextReminderDate.getDate() + 3)
+            break
+          case '5_DAYS':
+            nextReminderDate.setDate(nextReminderDate.getDate() + 5)
+            break
+          case '7_DAYS':
+            nextReminderDate.setDate(nextReminderDate.getDate() + 7)
+            break
+          case '2_WEEKS':
+            nextReminderDate.setDate(nextReminderDate.getDate() + 14)
+            break
+          case '3_WEEKS':
+            nextReminderDate.setDate(nextReminderDate.getDate() + 21)
+            break
+          case '1_MONTH':
+            nextReminderDate.setMonth(nextReminderDate.getMonth() + 1)
+            break
+          case '2_MONTHS':
+            nextReminderDate.setMonth(nextReminderDate.getMonth() + 2)
+            break
+          case '3_MONTHS':
+          default:
+            nextReminderDate.setMonth(nextReminderDate.getMonth() + 3)
+            break
+          case '6_MONTHS':
+            nextReminderDate.setMonth(nextReminderDate.getMonth() + 6)
+            break
+          case '9_MONTHS':
+            nextReminderDate.setMonth(nextReminderDate.getMonth() + 9)
+            break
+          case '12_MONTHS':
+            nextReminderDate.setFullYear(nextReminderDate.getFullYear() + 1)
+            break
+          case '18_MONTHS':
+            nextReminderDate.setMonth(nextReminderDate.getMonth() + 18)
+            break
+          case '24_MONTHS':
+            nextReminderDate.setFullYear(nextReminderDate.getFullYear() + 2)
+            break
+        }
+
+        await tx.contact.update({
+          where: { id: contactId },
+          data: {
+            lastTouchDate: now,
+            nextReminderDate: nextReminderDate
+          }
+        })
       }
+
+      return note
     })
+
+    const note = result
 
     return NextResponse.json(note, { status: 201 })
   } catch (error) {

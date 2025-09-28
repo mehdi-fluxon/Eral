@@ -141,6 +141,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       crmId,
       cadence,
       lastTouchDate,
+      nextReminderDate,
       generalNotes,
       customFields,
       companyIds,
@@ -163,9 +164,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       (lastTouchDate && new Date(lastTouchDate).getTime() !== existingContact.lastTouchDate.getTime()) ||
       (cadence && cadence !== existingContact.cadence)
     
-    const nextReminder = shouldRecalculateReminder 
-      ? calculateNextReminderDate(touchDate, newCadence)
-      : undefined
+    // Handle direct nextReminderDate updates (for AI agent custom timing)
+    let nextReminder = undefined
+    if (nextReminderDate) {
+      nextReminder = new Date(nextReminderDate)
+    } else if (shouldRecalculateReminder) {
+      nextReminder = calculateNextReminderDate(touchDate, newCadence)
+    }
 
     const updateData: any = {
       name,
