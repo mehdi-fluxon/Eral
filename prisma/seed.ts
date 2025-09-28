@@ -3,34 +3,28 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
-  const erad = await prisma.owner.upsert({
+  const erad = await prisma.teamMember.upsert({
     where: { email: 'erad@example.com' },
     update: {},
     create: {
-      username: 'erad',
-      password: 'hashed_password',
       name: 'Erad',
       email: 'erad@example.com'
     }
   })
 
-  const karl = await prisma.owner.upsert({
+  const karl = await prisma.teamMember.upsert({
     where: { email: 'karl@example.com' },
     update: {},
     create: {
-      username: 'karl',
-      password: 'hashed_password',
       name: 'Karl',
       email: 'karl@example.com'
     }
   })
 
-  const lasersox = await prisma.owner.upsert({
+  const lasersox = await prisma.teamMember.upsert({
     where: { email: 'lasersox@example.com' },
     update: {},
     create: {
-      username: 'lasersox',
-      password: 'hashed_password',
       name: 'lasersox',
       email: 'lasersox@example.com'
     }

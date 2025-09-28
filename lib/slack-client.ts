@@ -1,5 +1,5 @@
 import { WebClient } from '@slack/web-api'
-import { luxonAIAssistant } from './openai-assistant'
+import { luxonAIAssistant } from '../ai-assistant/assistant'
 
 export class SlackClient {
   private client: WebClient
@@ -9,7 +9,7 @@ export class SlackClient {
     this.client = new WebClient(process.env.SLACK_BOT_TOKEN)
   }
 
-  async handleMessage(event: any) {
+  async handleMessage(event: { bot_id?: string; thread_ts?: string; user: string; text: string; channel: string; ts: string }) {
     try {
       // Ignore bot messages and messages in threads (for now)
       if (event.bot_id || event.thread_ts) {
@@ -48,7 +48,7 @@ export class SlackClient {
     }
   }
 
-  async handleSlashCommand(payload: any) {
+  async handleSlashCommand(payload: { user_id: string; text: string; channel_id: string; response_url: string }) {
     try {
       const { user_id, text, channel_id, response_url } = payload
 

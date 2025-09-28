@@ -67,7 +67,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle the slash command
-    const response = await slackClient.handleSlashCommand(payload)
+    const response = await slackClient.handleSlashCommand({
+      user_id: payload.user_id as string,
+      text: payload.text as string,
+      channel_id: payload.channel_id as string,
+      response_url: payload.response_url as string
+    })
     
     return NextResponse.json(response)
   } catch (error) {

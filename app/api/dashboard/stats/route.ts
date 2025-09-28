@@ -68,7 +68,7 @@ export async function GET() {
       dueTodayContacts,
       dueThisWeekContacts
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 })
   }
 }

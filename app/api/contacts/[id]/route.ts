@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { calculateNextReminderDate, getReminderStatus } from '@/lib/cadence'
+import { Prisma } from '@prisma/client'
 
 /**
  * @swagger
@@ -172,7 +173,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       nextReminder = calculateNextReminderDate(touchDate, newCadence)
     }
 
-    const updateData: any = {
+    const updateData: Prisma.ContactUpdateInput = {
       name,
       email,
       jobTitle: jobTitle !== undefined ? (jobTitle || null) : undefined,

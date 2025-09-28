@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { calculateNextReminderDate, getReminderStatus } from '@/lib/cadence'
+import { Prisma } from '@prisma/client'
 
 /**
  * @swagger
@@ -97,7 +98,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
 
-    const where: any = {}
+    const where: Prisma.ContactWhereInput = {}
 
     if (search) {
       where.OR = [
@@ -221,7 +222,7 @@ export async function POST(request: NextRequest) {
     const touchDate = lastTouchDate ? new Date(lastTouchDate) : new Date()
     const nextReminder = calculateNextReminderDate(touchDate, cadence)
 
-    const contactData: any = {
+    const contactData: Prisma.ContactCreateInput = {
       name,
       email,
       jobTitle: jobTitle || null,

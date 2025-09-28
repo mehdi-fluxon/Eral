@@ -140,8 +140,8 @@ export default function ContactDetailsPage({ params }: { params: Promise<{ id: s
           lastTouchDate: new Date(data.lastTouchDate).toISOString().split('T')[0],
           generalNotes: data.generalNotes || '',
           customFields: data.customFields || {},
-          companyIds: data.companies.map((c: any) => c.company.id),
-          teamMemberIds: data.teamMembers.map((m: any) => m.teamMember.id)
+          companyIds: data.companies.map((c: { company: Company }) => c.company.id),
+          teamMemberIds: data.teamMembers.map((m: { teamMember: TeamMember }) => m.teamMember.id)
         })
       } else {
         showToast('Contact not found', 'error')

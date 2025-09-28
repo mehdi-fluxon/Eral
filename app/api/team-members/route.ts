@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 /**
  * @swagger
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
 
-    const where: any = {}
+    const where: Prisma.TeamMemberWhereInput = {}
     
     if (search) {
       where.OR = [
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
       data: { name, email }
     })
     return NextResponse.json(member, { status: 201 })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to create team member' }, { status: 500 })
   }
 }

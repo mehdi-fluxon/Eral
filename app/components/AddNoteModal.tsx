@@ -139,7 +139,6 @@ export default function AddNoteModal({ contactId, onClose, onSuccess }: AddNoteM
                   <button
                     type="button"
                     onClick={() => {
-                      const lines = content.split('\n')
                       const textarea = document.getElementById('note-content') as HTMLTextAreaElement
                       const start = textarea?.selectionStart || 0
                       const lineStart = content.lastIndexOf('\n', start - 1) + 1

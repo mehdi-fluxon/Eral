@@ -146,7 +146,7 @@ Format responses in a business-friendly way with clear action items and next ste
         console.error(`Error executing ${functionName}:`, error)
         toolOutputs.push({
           tool_call_id: toolCall.id,
-          output: JSON.stringify({ error: error.message })
+          output: JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })
         })
       }
     }
@@ -173,7 +173,7 @@ Format responses in a business-friendly way with clear action items and next ste
       console.error('Error processing message:', error)
       return {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         response: 'I apologize, but I encountered an error while processing your request. Please try again.'
       }
     }

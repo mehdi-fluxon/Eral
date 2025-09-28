@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 /**
  * @swagger
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
 
-    const where: any = {}
+    const where: Prisma.CompanyWhereInput = {}
     
     if (search) {
       where.OR = [
@@ -98,7 +99,7 @@ export async function GET(request: NextRequest) {
       orderBy: { name: 'asc' }
     })
     return NextResponse.json(companies)
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch companies' }, { status: 500 })
   }
 }
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
       data: { name, industry, size, website }
     })
     return NextResponse.json(company, { status: 201 })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to create company' }, { status: 500 })
   }
 }

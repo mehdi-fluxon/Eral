@@ -206,7 +206,7 @@ export default function LogInteractionModal({ contactId, onClose, onSuccess }: L
                 className="rounded border-gray-300"
               />
               <label htmlFor="updateLastTouch" className="text-sm text-gray-700">
-                Update "Last touch date" and recalculate next reminder based on cadence
+                Update &quot;Last touch date&quot; and recalculate next reminder based on cadence
               </label>
             </div>
             

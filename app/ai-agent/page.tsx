@@ -35,7 +35,7 @@ export default function AIAgentPage() {
       setThreadId(savedThreadId)
       try {
         const parsedMessages = JSON.parse(savedMessages)
-        setMessages(parsedMessages.map((msg: any) => ({
+        setMessages(parsedMessages.map((msg: Message & { timestamp: string }) => ({
           ...msg,
           timestamp: new Date(msg.timestamp)
         })))
@@ -261,19 +261,19 @@ What would you like to do?`,
               <div className="space-y-2">
                 <h4 className="font-medium text-gray-700">View & Search</h4>
                 <div className="text-sm text-gray-600 space-y-1">
-                  <div>• "Show me all overdue contacts"</div>
-                  <div>• "Who needs follow-up this week?"</div>
-                  <div>• "Find contacts at fintech companies"</div>
-                  <div>• "Dashboard stats"</div>
+                  <div>• &quot;Show me all overdue contacts&quot;</div>
+                  <div>• &quot;Who needs follow-up this week?&quot;</div>
+                  <div>• &quot;Find contacts at fintech companies&quot;</div>
+                  <div>• &quot;Dashboard stats&quot;</div>
                 </div>
               </div>
               <div className="space-y-2">
                 <h4 className="font-medium text-gray-700">Add & Update</h4>
                 <div className="text-sm text-gray-600 space-y-1">
-                  <div>• "Add Sarah Kim from HealthTech"</div>
-                  <div>• "I called John about the proposal"</div>
-                  <div>• "Jane wants a follow-up in 2 days"</div>
-                  <div>• "Update Mike's job title to VP"</div>
+                  <div>• &quot;Add Sarah Kim from HealthTech&quot;</div>
+                  <div>• &quot;I called John about the proposal&quot;</div>
+                  <div>• &quot;Jane wants a follow-up in 2 days&quot;</div>
+                  <div>• &quot;Update Mike&apos;s job title to VP&quot;</div>
                 </div>
               </div>
             </div>

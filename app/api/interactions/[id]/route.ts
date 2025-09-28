@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 /**
  * @swagger
@@ -88,7 +89,7 @@ export async function PATCH(
       interactionDate
     } = await request.json()
 
-    const updateData: any = {}
+    const updateData: Prisma.InteractionUpdateInput = {}
     
     if (type) updateData.type = type
     if (subject !== undefined) updateData.subject = subject || null
