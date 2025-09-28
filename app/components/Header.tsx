@@ -28,14 +28,11 @@ export default function Header() {
               <Link href="/contacts" className="text-gray-700 hover:text-indigo-600 transition-colors font-medium">
                 Contacts
               </Link>
-              <Link href="/follow-ups" className="text-gray-700 hover:text-indigo-600 transition-colors font-medium">
-                Follow-ups
+              <Link href="/companies" className="text-gray-700 hover:text-indigo-600 transition-colors font-medium">
+                Companies
               </Link>
-              <Link href="/reminders" className="text-gray-700 hover:text-indigo-600 transition-colors font-medium">
-                Reminders
-              </Link>
-              <Link href="/analytics" className="text-gray-700 hover:text-indigo-600 transition-colors font-medium">
-                Analytics
+              <Link href="/team" className="text-gray-700 hover:text-indigo-600 transition-colors font-medium">
+                Team
               </Link>
               <Link href="/ai-agent" className="text-gray-700 hover:text-indigo-600 transition-colors font-medium">
                 🤖 AI Agent
@@ -49,9 +46,6 @@ export default function Header() {
           <div className="hidden md:flex items-center space-x-4">
             <Link href="/contacts" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm">
               Add Contact
-            </Link>
-            <Link href="/reminders" className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors">
-              Weekly Reminder
             </Link>
           </div>
 
@@ -74,14 +68,11 @@ export default function Header() {
               <Link href="/contacts" className="block px-3 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-md transition-colors">
                 Contacts
               </Link>
-              <Link href="/follow-ups" className="block px-3 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-md transition-colors">
-                Follow-ups
+              <Link href="/companies" className="block px-3 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-md transition-colors">
+                Companies
               </Link>
-              <Link href="/reminders" className="block px-3 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-md transition-colors">
-                Reminders
-              </Link>
-              <Link href="/analytics" className="block px-3 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-md transition-colors">
-                Analytics
+              <Link href="/team" className="block px-3 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-md transition-colors">
+                Team
               </Link>
               <Link href="/ai-agent" className="block px-3 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-md transition-colors">
                 🤖 AI Agent
