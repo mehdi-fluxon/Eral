@@ -581,31 +581,35 @@ const options: swaggerJSDoc.Options = {
     tags: [
       {
         name: 'Contacts',
-        description: 'Contact management operations'
+        description: 'Contact management operations - Create, read, update, delete contacts with full support for companies, team members, and custom fields'
       },
       {
         name: 'Companies',
-        description: 'Company management operations'
+        description: 'Company management operations - Manage company records with search capabilities'
       },
       {
         name: 'Team Members',
-        description: 'Team member management operations'
+        description: 'Team member management operations - Manage team members who interact with contacts'
       },
       {
         name: 'Notes',
-        description: 'Contact notes operations'
+        description: 'Contact notes operations - Add and manage notes for contacts'
       },
       {
         name: 'Interactions',
-        description: 'Contact interaction logging'
+        description: 'Contact interaction logging - Track calls, emails, meetings, and other interactions with automatic reminder updates'
       },
       {
         name: 'Dashboard',
-        description: 'Dashboard and analytics'
+        description: 'Dashboard and analytics - Get overview statistics and metrics'
       },
       {
         name: 'Timeline',
-        description: 'Contact activity timeline'
+        description: 'Contact activity timeline - View chronological history of all contact activities'
+      },
+      {
+        name: 'AI Agent',
+        description: 'Natural language AI assistant for contact management tasks'
       }
     ]
   },

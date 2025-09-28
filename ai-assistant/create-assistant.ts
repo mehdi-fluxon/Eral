@@ -1,192 +1,16 @@
-// Maps AI assistant function calls to actual API endpoints
-export async function executeFunction(functionName: string, parameters: any, baseUrl: string = 'http://localhost:3001') {
-  try {
-    switch (functionName) {
-      // ==================== CONTACTS ====================
-      
-      case 'search_contacts': {
-        const searchParams = new URLSearchParams()
-        if (parameters.search) searchParams.append('search', parameters.search)
-        if (parameters.reminderStatus) searchParams.append('reminderStatus', parameters.reminderStatus)
-        if (parameters.teamMember) searchParams.append('teamMember', parameters.teamMember)
-        if (parameters.cadence) searchParams.append('cadence', parameters.cadence)
-        if (parameters.company) searchParams.append('company', parameters.company)
-        if (parameters.page) searchParams.append('page', parameters.page.toString())
-        if (parameters.limit) searchParams.append('limit', parameters.limit.toString())
+import OpenAI from 'openai'
+import * as fs from 'fs'
+import * as path from 'path'
+import * as dotenv from 'dotenv'
 
-        const response = await fetch(`${baseUrl}/api/contacts?${searchParams}`)
-        return await response.json()
-      }
+dotenv.config()
 
-      case 'create_contact': {
-        const response = await fetch(`${baseUrl}/api/contacts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(parameters)
-        })
-        return await response.json()
-      }
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
 
-      case 'get_contact_by_id': {
-        const response = await fetch(`${baseUrl}/api/contacts/${parameters.id}`)
-        return await response.json()
-      }
-
-      case 'update_contact': {
-        const { id, ...updateData } = parameters
-        const response = await fetch(`${baseUrl}/api/contacts/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updateData)
-        })
-        return await response.json()
-      }
-
-      case 'delete_contact': {
-        const response = await fetch(`${baseUrl}/api/contacts/${parameters.id}`, {
-          method: 'DELETE'
-        })
-        return await response.json()
-      }
-
-      // ==================== NOTES ====================
-      
-      case 'add_note_to_contact': {
-        const { contactId, ...noteData } = parameters
-        const response = await fetch(`${baseUrl}/api/contacts/${contactId}/notes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(noteData)
-        })
-        return await response.json()
-      }
-
-      case 'delete_note': {
-        const response = await fetch(`${baseUrl}/api/notes/${parameters.id}`, {
-          method: 'DELETE'
-        })
-        return await response.json()
-      }
-
-      // ==================== INTERACTIONS ====================
-      
-      case 'add_interaction_to_contact': {
-        const { contactId, ...interactionData } = parameters
-        const response = await fetch(`${baseUrl}/api/contacts/${contactId}/interactions`, {
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...interactionData,
-            interactionDate: interactionData.interactionDate || new Date().toISOString().split('T')[0],
-            updateLastTouch: interactionData.updateLastTouch !== false
-          })
-        })
-        return await response.json()
-      }
-
-      case 'update_interaction': {
-        const { id, ...updateData } = parameters
-        const response = await fetch(`${baseUrl}/api/interactions/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updateData)
-        })
-        return await response.json()
-      }
-
-      case 'delete_interaction': {
-        const response = await fetch(`${baseUrl}/api/interactions/${parameters.id}`, {
-          method: 'DELETE'
-        })
-        return await response.json()
-      }
-
-      // ==================== TIMELINE ====================
-      
-      case 'get_contact_timeline': {
-        const response = await fetch(`${baseUrl}/api/contacts/${parameters.contactId}/timeline`)
-        return await response.json()
-      }
-
-      // ==================== DASHBOARD ====================
-      
-      case 'get_dashboard_stats': {
-        const response = await fetch(`${baseUrl}/api/dashboard/stats`)
-        return await response.json()
-      }
-
-      // ==================== COMPANIES ====================
-      
-      case 'search_companies': {
-        const searchParams = new URLSearchParams()
-        if (parameters.search) searchParams.append('search', parameters.search)
-        const response = await fetch(`${baseUrl}/api/companies?${searchParams}`)
-        return await response.json()
-      }
-
-      case 'create_company': {
-        const response = await fetch(`${baseUrl}/api/companies`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(parameters)
-        })
-        return await response.json()
-      }
-
-      case 'get_company_by_id': {
-        const response = await fetch(`${baseUrl}/api/companies/${parameters.id}`)
-        return await response.json()
-      }
-
-      case 'update_company': {
-        const { id, ...updateData } = parameters
-        const response = await fetch(`${baseUrl}/api/companies/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updateData)
-        })
-        return await response.json()
-      }
-
-      case 'delete_company': {
-        const response = await fetch(`${baseUrl}/api/companies/${parameters.id}`, {
-          method: 'DELETE'
-        })
-        return await response.json()
-      }
-
-      // ==================== TEAM MEMBERS ====================
-      
-      case 'search_team_members': {
-        const searchParams = new URLSearchParams()
-        if (parameters.search) searchParams.append('search', parameters.search)
-        const response = await fetch(`${baseUrl}/api/team-members?${searchParams}`)
-        return await response.json()
-      }
-
-      case 'create_team_member': {
-        const response = await fetch(`${baseUrl}/api/team-members`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(parameters)
-        })
-        return await response.json()
-      }
-
-      default:
-        throw new Error(`Unknown function: ${functionName}`)
-    }
-  } catch (error: any) {
-    console.error(`Error executing function ${functionName}:`, error)
-    throw error
-  }
-}
-
-// Generate OpenAI function definitions
-export function generateOpenAIFunctions() {
+function generateOpenAIFunctions() {
   const functions = []
-  
-  // ==================== CONTACTS ====================
   
   functions.push({
     name: "search_contacts",
@@ -417,8 +241,6 @@ export function generateOpenAIFunctions() {
     }
   })
 
-  // ==================== NOTES ====================
-  
   functions.push({
     name: "add_note_to_contact",
     description: "Add a note to a contact. This automatically updates the last touch date and recalculates reminders.",
@@ -457,11 +279,9 @@ export function generateOpenAIFunctions() {
     }
   })
 
-  // ==================== INTERACTIONS ====================
-  
   functions.push({
     name: "add_interaction_to_contact", 
-    description: "Log an interaction (call, email, meeting, etc.) with a contact. This automatically updates last touch date and recalculates reminders by default.",
+    description: "Log an interaction (call, email, meeting, etc.) with a contact. This automatically updates last touch date and recalculates reminders.",
     parameters: {
       type: "object",
       properties: {
@@ -489,7 +309,7 @@ export function generateOpenAIFunctions() {
         interactionDate: {
           type: "string",
           format: "date",
-          description: "Interaction date (YYYY-MM-DD), defaults to today"
+          description: "Interaction date (YYYY-MM-DD)"
         },
         teamMemberId: {
           type: "string",
@@ -498,7 +318,7 @@ export function generateOpenAIFunctions() {
         updateLastTouch: {
           type: "boolean", 
           default: true,
-          description: "Whether to update contact last touch date and recalculate reminder (defaults to true)"
+          description: "Whether to update contact last touch date and recalculate reminder"
         }
       },
       required: ["contactId", "type", "content", "teamMemberId"]
@@ -557,8 +377,6 @@ export function generateOpenAIFunctions() {
     }
   })
 
-  // ==================== TIMELINE & DASHBOARD ====================
-  
   functions.push({
     name: "get_contact_timeline",
     description: "Get chronological timeline of notes and interactions for a contact",
@@ -583,8 +401,6 @@ export function generateOpenAIFunctions() {
     }
   })
 
-  // ==================== COMPANIES ====================
-  
   functions.push({
     name: "search_companies",
     description: "Search companies by name or industry. Use this to find companies before creating or updating.",
@@ -689,8 +505,6 @@ export function generateOpenAIFunctions() {
     }
   })
 
-  // ==================== TEAM MEMBERS ====================
-  
   functions.push({
     name: "search_team_members",
     description: "Search team members by name or email. Use this to find team members before creating or assigning.",
@@ -727,3 +541,156 @@ export function generateOpenAIFunctions() {
 
   return functions
 }
+
+async function createAssistant() {
+  const apiDocumentation = fs.readFileSync(
+    path.join(__dirname, 'api-documentation.md'),
+    'utf-8'
+  )
+
+  const functions = generateOpenAIFunctions()
+
+  const instructions = `You are LuxonAI's intelligent contact management assistant. You help users manage their professional relationships through natural language.
+
+## Your Capabilities
+You have access to a comprehensive Contact Management API with the following capabilities:
+- Search and filter contacts by various criteria (name, company, reminder status, cadence, team member)
+- Create and update contact information with full support for companies, team members, and custom fields
+- Log interactions (email, call, meeting, LinkedIn, etc.) that automatically update last touch dates
+- Add notes to contacts that automatically update reminders
+- Manage companies and team members (full CRUD operations)
+- View dashboard statistics and contact timelines
+- Handle custom reminder scheduling
+
+## Critical Instructions: BE PROACTIVE AND AUTONOMOUS
+
+### 1. NEVER Ask for IDs - ALWAYS Search First
+When a user mentions a person, company, or team member by NAME, you MUST:
+- IMMEDIATELY use the appropriate search function (search_contacts, search_companies, search_team_members)
+- Find the ID yourself
+- Use the ID in subsequent operations
+- ONLY ask for clarification if multiple matches are found or no matches exist
+
+### 2. Multi-Step Operations - Execute Automatically
+For complex requests, break them down and execute all steps:
+- Example: "Set John Doe's company to Acme Corp"
+  1. Search for contact "John Doe" (get contact ID)
+  2. Search for company "Acme Corp" (get company ID)
+  3. Update contact with company ID
+  4. Report success with details
+
+### 3. Handling Search Results
+- **Single match found**: Use it immediately, confirm action with user
+- **Multiple matches**: Present options with distinguishing details (email, job title, etc.)
+- **No matches**: Suggest creating a new record, offer to help with that
+
+### 4. Automatic Reminder Management
+Understanding the reminder system:
+- Every contact has a \`cadence\` (follow-up frequency like "3_MONTHS")
+- \`lastTouchDate\` is when you last contacted them
+- \`nextReminderDate\` is automatically calculated: lastTouchDate + cadence
+- When you add a NOTE or INTERACTION, it automatically updates lastTouchDate and recalculates nextReminderDate
+
+When user says:
+- "Remind me in 2 days" → Calculate date and use update_contact with nextReminderDate
+- "I called John today" → Use add_interaction_to_contact (automatically updates reminders)
+- "Add a note to Jane" → Use add_note_to_contact (automatically updates reminders)
+
+### 5. Smart Filtering
+When user asks for:
+- "Overdue contacts" → search_contacts with reminderStatus=OVERDUE
+- "Contacts due today" → search_contacts with reminderStatus=DUE_TODAY
+- "Upcoming reminders" → search_contacts with reminderStatus=UPCOMING
+- "Alice's contacts" → First search_team_members for "Alice", then search_contacts with teamMember=<id>
+
+### 6. Context-Rich Responses
+Always provide:
+- Clear confirmation of actions taken
+- Relevant details (name, email, company)
+- Next steps or suggestions
+- Counts and summaries for lists
+
+### 7. Sentiment and Outcome Parsing
+When logging interactions, extract:
+- Positive/negative sentiment from content
+- Action items and follow-ups mentioned
+- Outcomes and next steps
+- Suggest appropriate reminder dates based on context
+
+## Complete API Reference
+
+${apiDocumentation}
+
+## Response Format Guidelines
+- Use clear, business-friendly language
+- Structure responses with headers and bullet points for readability
+- For lists, provide summary counts
+- For updates, confirm what changed
+- Suggest proactive next steps based on context
+- Be conversational but professional
+
+## Error Handling
+- If a function call fails, explain what went wrong in plain language
+- Suggest alternative approaches
+- Never expose technical error details to users
+
+## Examples of Excellent Behavior
+
+### Example 1: User asks "Show me John's overdue reminders"
+Good Response Flow:
+1. Use search_contacts with search="John"
+2. If multiple Johns found, ask: "I found 3 contacts named John: John Smith (CEO at Acme), John Doe (CTO at Tech Corp), and John Lee (Marketing at StartUp). Which one?"
+3. Once identified, use get_contact_by_id
+4. Check reminderStatus
+5. Respond: "John Smith has 1 overdue reminder. Last touched on Jan 15, should have followed up on Apr 15. Would you like to log an interaction or add a note?"
+
+### Example 2: User says "Log a call with Jane about Q4 planning"
+Good Response Flow:
+1. Use search_contacts with search="Jane"
+2. If found (e.g., Jane Doe), use add_interaction_to_contact:
+   - type: "CALL"
+   - subject: "Q4 Planning Discussion"
+   - content: "Discussed Q4 planning"
+   - This automatically updates her lastTouchDate and recalculates reminder
+3. Respond: "✓ Logged call with Jane Doe about Q4 planning. Her next reminder is now set for [date] based on her 3-month cadence. Would you like to add any additional notes or outcomes?"
+
+### Example 3: User says "Create contact Mike Johnson at Startup Inc, follow up in 2 weeks"
+Good Response Flow:
+1. Search for company "Startup Inc" using search_companies
+2. If not found, create company first
+3. Create contact with:
+   - name: "Mike Johnson"
+   - companyIds: [found or created company ID]
+   - cadence: "2_WEEKS"
+   - lastTouchDate: today
+4. Respond: "✓ Created contact Mike Johnson at Startup Inc. Set to follow up in 2 weeks (next reminder: [date]). Would you like to add any notes or details about Mike?"
+
+Remember: Your goal is to make contact management effortless through intelligent automation and proactive assistance.`
+
+  console.log('Creating new assistant with comprehensive API documentation...')
+  console.log(`Number of functions: ${functions.length}`)
+
+  const assistant = await openai.beta.assistants.create({
+    name: "LuxonAI Contact Manager",
+    instructions: instructions,
+    model: "gpt-4o",
+    tools: functions.map(func => ({ type: "function" as const, function: func }))
+  })
+
+  console.log('\n✓ Assistant created successfully!')
+  console.log(`\nAssistant ID: ${assistant.id}`)
+  console.log(`\nAdd this to your .env file:`)
+  console.log(`OPENAI_ASSISTANT_ID="${assistant.id}"`)
+  
+  return assistant
+}
+
+createAssistant()
+  .then(() => {
+    console.log('\n✓ Done!')
+    process.exit(0)
+  })
+  .catch(error => {
+    console.error('Error creating assistant:', error)
+    process.exit(1)
+  })

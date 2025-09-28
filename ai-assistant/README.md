@@ -1,63 +1,80 @@
-# LuxonAI Assistant
+# AI Assistant - Essential Files Only
 
-All AI assistant related code is centralized in this folder for easier maintenance.
+This directory contains only the essential files needed for the AI agent to function.
 
-## Structure
+## Essential Runtime Files (3 files)
+
+### 1. `assistant.ts` ✅ REQUIRED
+- Core OpenAI Assistant logic
+- Manages threads, messages, and function execution
+- Used by: `/app/api/ai-agent/route.ts`
+
+### 2. `functions.ts` ✅ REQUIRED
+- Maps AI function calls to actual API endpoints
+- Contains `executeFunction()` for API calls
+- Contains `generateOpenAIFunctions()` for function definitions
+- Used by: `assistant.ts` and `create-assistant.ts`
+
+### 3. `create-assistant.ts` ⚠️ SETUP ONLY
+- Used to create/recreate the OpenAI Assistant
+- Run once when setting up or updating functions
+- Not needed for runtime
+- Command: `npx tsx ai-assistant/create-assistant.ts`
+
+## Documentation Files (2 files)
+
+### 4. `FUNCTION_MAPPING.md` 📚 REFERENCE
+- Complete reference of all 19 function mappings
+- Explains how functions map to API endpoints
+- Useful for development and troubleshooting
+
+### 5. `README.md` 📚 THIS FILE
+- Overview of the directory structure
+
+## What Was Removed
+
+❌ `test-assistant.ts` - Testing utility, not needed for production  
+❌ `api-documentation.md` - Reference doc, kept in FUNCTION_MAPPING.md  
+❌ `api/route.ts` - Duplicate, real one is in `/app/api/ai-agent/`  
+❌ `ui/page.tsx` - UI component, optional  
+
+## How It Works
+
+1. **User Request** → API endpoint `/app/api/ai-agent/route.ts`
+2. **Assistant** → `assistant.ts` processes the request via OpenAI
+3. **Function Call** → OpenAI decides to call a function (e.g., `search_contacts`)
+4. **Execution** → `functions.ts` maps function to API call
+5. **Response** → Returns data to OpenAI, which formats response
+
+## File Dependencies
 
 ```
-ai-assistant/
-├── assistant.ts          # OpenAI Assistant wrapper (thread management, polling)
-├── functions.ts          # Function schemas and execution logic
-├── api/                  # API route handlers (copied to app/api/ai-agent/)
-│   └── route.ts
-├── ui/                   # UI components (copied to app/ai-agent/)
-│   └── page.tsx
-└── update-assistant.mjs  # Utility script to update assistant config
+/app/api/ai-agent/route.ts
+    ↓
+assistant.ts
+    ↓
+functions.ts
+    ↓
+Your API endpoints (/app/api/contacts, etc.)
 ```
 
-## Files
+## Required Environment Variables
 
-### `assistant.ts`
-- OpenAI Assistants API wrapper
-- Thread creation and management
-- Run polling and completion handling
-- Function calling orchestration
+```env
+OPENAI_API_KEY="sk-..."
+OPENAI_ASSISTANT_ID="asst_..."
+```
 
-### `functions.ts`
-- Generates OpenAI function schemas from API endpoints
-- Executes function calls by routing to appropriate APIs
-- Handles contact search, creation, updates, notes, dashboard stats
+## Setup New Assistant
 
-### `api/route.ts`
-- Next.js API route for AI agent interactions
-- Handles POST (send message) and GET (create thread) endpoints
-- Note: This file is **copied** to `app/api/ai-agent/route.ts` for Next.js routing
+When you need to recreate the assistant (e.g., after modifying functions):
 
-### `ui/page.tsx`
-- Chat interface UI component
-- localStorage-based conversation persistence
-- Message display and input handling
-- Note: This file is **copied** to `app/ai-agent/page.tsx` for Next.js routing
-
-### `update-assistant.mjs`
-- Utility script to update assistant configuration (model, instructions, etc.)
-- Run with: `node -r dotenv/config ai-assistant/update-assistant.mjs`
-
-## Usage
-
-### Update Assistant Configuration
 ```bash
-node -r dotenv/config ai-assistant/update-assistant.mjs
+npx tsx ai-assistant/create-assistant.ts
+# Copy the new assistant ID to .env
 ```
 
-### Import in Code
-```typescript
-import { luxonAIAssistant } from '@/ai-assistant/assistant'
-import { generateOpenAIFunctions, executeFunction } from '@/ai-assistant/functions'
-```
-
-## Notes
-
-- Next.js requires API routes to be in `app/api/` and pages in `app/`
-- Source of truth files are in `ai-assistant/`, but they're copied to Next.js structure
-- After editing `api/route.ts` or `ui/page.tsx`, copy them back to Next.js folders
+## Total Files: 5
+- **Runtime Essential**: 2 files (`assistant.ts`, `functions.ts`)
+- **Setup Tool**: 1 file (`create-assistant.ts`)
+- **Documentation**: 2 files (`FUNCTION_MAPPING.md`, `README.md`)
