@@ -13,10 +13,149 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Todo {
+model Contact {
+  id                String    @id @default(cuid())
+  name              String
+  email             String
+  jobTitle          String?
+  linkedinUrl       String?
+  referrer          String?
+  labels            String?
+  crmId             String?
+  cadence           String    @default("3_MONTHS")
+  lastTouchDate     DateTime  @default(now())
+  nextReminderDate  DateTime?
+  generalNotes      String?   @db.Text
+  customFields      Json?
+  lastContactAt     DateTime?
+  
+  companies         ContactCompany[]
+  teamMembers       ContactTeamMember[]
+  notes             Note[]
+  interactions      Interaction[]
+  followUps         FollowUp[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([nextReminderDate])
+  @@index([email])
+  @@index([name])
+  @@index([labels])
+  @@map("contacts")
+}
+
+model ContactCompany {
+  id         String   @id @default(cuid())
+  contactId  String
+  companyId  String
+  
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+  
+  @@unique([contactId, companyId])
+  @@index([contactId])
+  @@index([companyId])
+  @@map("contact_companies")
+}
+
+model ContactTeamMember {
+  id           String     @id @default(cuid())
+  contactId    String
+  teamMemberId String
+  
+  contact      Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+  
+  createdAt    DateTime   @default(now())
+  
+  @@unique([contactId, teamMemberId])
+  @@index([contactId])
+  @@index([teamMemberId])
+  @@map("contact_team_members")
+}
+
+model Company {
+  id         String           @id @default(cuid())
+  name       String
+  website    String?
+  industry   String?
+  size       String?
+  
+  contacts   ContactCompany[]
+  
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  
+  @@map("companies")
+}
+
+model Note {
+  id           String     @id @default(cuid())
+  contactId    String
+  teamMemberId String
+  content      String     @db.Text
+  
+  contact      Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id])
+  
+  createdAt    DateTime   @default(now())
+
+  @@index([contactId, createdAt])
+  @@map("notes")
+}
+
+model Interaction {
+  id           String     @id @default(cuid())
+  contactId    String
+  teamMemberId String
+  type         String
+  subject      String?
+  content      String     @db.Text
+  outcome      String?    @db.Text
+  interactionDate DateTime @default(now())
+  
+  contact      Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id])
+  
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([contactId, interactionDate])
+  @@map("interactions")
+}
+
+model TeamMember {
+  id           String               @id @default(cuid())
+  name         String
+  email        String               @unique
+  contacts     ContactTeamMember[]
+  notes        Note[]
+  interactions Interaction[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@map("team_members")
+}
+
+model FollowUp {
   id        String   @id @default(cuid())
-  title     String
-  completed Boolean  @default(false)
+  contactId String
+  dueDate   DateTime
+  status    String   @default("PENDING")
+  cadence   String?
+  notes     String?  @db.Text
+  
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([contactId])
+  @@index([status, dueDate])
+  @@map("follow_ups")
 }
+
+

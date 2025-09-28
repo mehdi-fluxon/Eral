@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ERAL Task Manager",
-  description: "Enterprise task management application powered by ERAL",
+  title: "LuxonAI",
+  description: "AI-powered relationship and contact management platform",
 };
 
 export default function RootLayout({
