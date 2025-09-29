@@ -107,11 +107,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { name, industry, size, website } = await request.json()
+    
+    // Validate required field
+    if (!name) {
+      return NextResponse.json({ error: 'Company name is required' }, { status: 400 })
+    }
+    
     const company = await prisma.company.create({
       data: { name, industry, size, website }
     })
     return NextResponse.json(company, { status: 201 })
-  } catch {
-    return NextResponse.json({ error: 'Failed to create company' }, { status: 500 })
+  } catch (error) {
+    console.error('Error creating company:', error)
+    return NextResponse.json({ 
+      error: 'Failed to create company',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }

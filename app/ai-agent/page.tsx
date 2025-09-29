@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useToast } from '@/app/hooks/useToast'
+import AssistantActivityStatus from '@/components/AssistantActivityStatus'
 
 interface Message {
   id: string
@@ -212,12 +213,7 @@ What would you like to do?`,
               
               {isLoading && (
                 <div className="flex justify-start">
-                  <div className="bg-gray-100 text-gray-900 rounded-lg px-4 py-3">
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
-                      <span>Thinking...</span>
-                    </div>
-                  </div>
+                  <AssistantActivityStatus threadId={threadId || undefined} />
                 </div>
               )}
               
