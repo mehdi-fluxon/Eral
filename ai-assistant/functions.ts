@@ -1,33 +1,5 @@
-// Store activity logs in memory for UI display
-export const activityLog: any[] = [];
-
-function logActivity(activity: any) {
-  const logEntry = {
-    ...activity,
-    timestamp: new Date().toISOString(),
-    id: Math.random().toString(36).substr(2, 9)
-  };
-  activityLog.unshift(logEntry); // Add to beginning
-  // Keep only last 50 activities
-  if (activityLog.length > 50) {
-    activityLog.pop();
-  }
-  return logEntry;
-}
-
 // Maps AI assistant function calls to actual API endpoints
 export async function executeFunction(functionName: string, parameters: any, baseUrl: string = 'http://localhost:3001') {
-  const startTime = Date.now();
-  
-  // Log the start of the function
-  const activityId = logActivity({
-    functionName,
-    parameters,
-    status: 'started',
-    actionType: getActionType(functionName),
-    entityType: getEntityType(functionName),
-    description: getActionDescription(functionName, parameters)
-  }).id;
   
   try {
     switch (functionName) {
@@ -44,17 +16,7 @@ export async function executeFunction(functionName: string, parameters: any, bas
         if (parameters.limit) searchParams.append('limit', parameters.limit.toString())
 
         const response = await fetch(`${baseUrl}/api/contacts?${searchParams}`)
-        const result = await response.json()
-        
-        // Update activity log with success
-        const log = activityLog.find(a => a.id === activityId);
-        if (log) {
-          log.status = 'success';
-          log.result = { count: Array.isArray(result) ? result.length : result.data?.length || 0 };
-          log.duration = Date.now() - startTime;
-        }
-        
-        return result
+        return await response.json()
       }
 
       case 'create_contact': {
@@ -63,17 +25,7 @@ export async function executeFunction(functionName: string, parameters: any, bas
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(parameters)
         })
-        const result = await response.json()
-        
-        // Update activity log with success
-        const log = activityLog.find(a => a.id === activityId);
-        if (log) {
-          log.status = 'success';
-          log.result = { id: result.id, name: result.name };
-          log.duration = Date.now() - startTime;
-        }
-        
-        return result
+        return await response.json()
       }
 
       case 'get_contact_by_id': {
@@ -107,17 +59,7 @@ export async function executeFunction(functionName: string, parameters: any, bas
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(noteData)
         })
-        const result = await response.json()
-        
-        // Update activity log with success
-        const log = activityLog.find(a => a.id === activityId);
-        if (log) {
-          log.status = 'success';
-          log.result = { success: true };
-          log.duration = Date.now() - startTime;
-        }
-        
-        return result
+        return await response.json()
       }
 
       case 'delete_note': {
@@ -140,17 +82,7 @@ export async function executeFunction(functionName: string, parameters: any, bas
             updateLastTouch: interactionData.updateLastTouch !== false
           })
         })
-        const result = await response.json()
-        
-        // Update activity log with success
-        const log = activityLog.find(a => a.id === activityId);
-        if (log) {
-          log.status = 'success';
-          log.result = { type: interactionData.type, success: true };
-          log.duration = Date.now() - startTime;
-        }
-        
-        return result
+        return await response.json()
       }
 
       case 'update_interaction': {
@@ -194,15 +126,6 @@ export async function executeFunction(functionName: string, parameters: any, bas
         if (!response.ok) {
           throw new Error(data.error || `Failed to search companies: ${response.status}`)
         }
-        
-        // Update activity log with success
-        const log = activityLog.find(a => a.id === activityId);
-        if (log) {
-          log.status = 'success';
-          log.result = { count: Array.isArray(data) ? data.length : 0 };
-          log.duration = Date.now() - startTime;
-        }
-        
         return data
       }
 
@@ -216,15 +139,6 @@ export async function executeFunction(functionName: string, parameters: any, bas
         if (!response.ok) {
           throw new Error(data.error || `Failed to create company: ${response.status}`)
         }
-        
-        // Update activity log with success
-        const log = activityLog.find(a => a.id === activityId);
-        if (log) {
-          log.status = 'success';
-          log.result = { id: data.id, name: data.name };
-          log.duration = Date.now() - startTime;
-        }
-        
         return data
       }
 
@@ -285,69 +199,7 @@ export async function executeFunction(functionName: string, parameters: any, bas
     }
   } catch (error: any) {
     console.error(`Error executing function ${functionName}:`, error)
-    
-    // Update activity log with error
-    const errorLog = activityLog.find(a => a.id === activityId);
-    if (errorLog) {
-      errorLog.status = 'error';
-      errorLog.error = error.message;
-      errorLog.duration = Date.now() - startTime;
-    }
-    
     throw error
-  }
-}
-
-function getActionType(functionName: string): string {
-  if (functionName.startsWith('search_') || functionName.startsWith('get_')) return 'SEARCH';
-  if (functionName.startsWith('create_') || functionName.startsWith('add_')) return 'CREATE';
-  if (functionName.startsWith('update_')) return 'UPDATE';
-  if (functionName.startsWith('delete_')) return 'DELETE';
-  return 'OTHER';
-}
-
-function getEntityType(functionName: string): string {
-  if (functionName.includes('contact')) return 'CONTACT';
-  if (functionName.includes('company') || functionName.includes('companies')) return 'COMPANY';
-  if (functionName.includes('note')) return 'NOTE';
-  if (functionName.includes('interaction')) return 'INTERACTION';
-  if (functionName.includes('team_member')) return 'TEAM_MEMBER';
-  if (functionName.includes('dashboard')) return 'DASHBOARD';
-  return 'OTHER';
-}
-
-function getActionDescription(functionName: string, parameters: any): string {
-  switch(functionName) {
-    case 'search_contacts':
-      return `Searching contacts${parameters.search ? ` for "${parameters.search}"` : ''}`;
-    case 'create_contact':
-      return `Creating contact: ${parameters.name}`;
-    case 'update_contact':
-      return `Updating contact${parameters.name ? `: ${parameters.name}` : ''}`;
-    case 'delete_contact':
-      return `Deleting contact`;
-    case 'search_companies':
-      return `Searching companies${parameters.search ? ` for "${parameters.search}"` : ''}`;
-    case 'create_company':
-      return `Creating company: ${parameters.name}`;
-    case 'update_company':
-      return `Updating company${parameters.name ? `: ${parameters.name}` : ''}`;
-    case 'delete_company':
-      return `Deleting company`;
-    case 'add_note_to_contact':
-      return `Adding note to contact`;
-    case 'add_interaction_to_contact':
-      return `Adding ${parameters.type || 'interaction'} to contact`;
-    case 'search_team_members':
-      return `Searching team members${parameters.search ? ` for "${parameters.search}"` : ''}`;
-    case 'create_team_member':
-      return `Creating team member: ${parameters.name}`;
-    case 'get_dashboard_stats':
-      return 'Fetching dashboard statistics';
-    case 'get_contact_timeline':
-      return 'Fetching contact timeline';
-    default:
-      return functionName.replace(/_/g, ' ');
   }
 }
 
