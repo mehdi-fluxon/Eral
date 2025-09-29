@@ -10,6 +10,29 @@ interface Message {
   timestamp: Date
 }
 
+// Simple rich text renderer
+const MessageRenderer = ({ content, role }: { content: string; role: 'user' | 'assistant' }) => {
+  if (role === 'user') {
+    return <div className="whitespace-pre-wrap">{content}</div>
+  }
+
+  // Parse markdown-like formatting for assistant messages
+  const formatText = (text: string) => {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
+      .replace(/^- (.+)$/gm, '<div class="ml-4 mb-1">• $1</div>') // Bullet points
+      .replace(/^• (.+)$/gm, '<div class="ml-4 mb-1">• $1</div>') // Bullet points
+  }
+
+  return (
+    <div 
+      className="whitespace-pre-wrap prose prose-sm max-w-none"
+      dangerouslySetInnerHTML={{ __html: formatText(content) }}
+    />
+  )
+}
+
 export default function AIAgentPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -198,7 +221,7 @@ What would you like to do?`,
                         : 'bg-gray-100 text-gray-900'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap">{message.content}</div>
+                    <MessageRenderer content={message.content} role={message.role} />
                     <div
                       className={`text-xs mt-2 ${
                         message.role === 'user' ? 'text-indigo-200' : 'text-gray-500'
