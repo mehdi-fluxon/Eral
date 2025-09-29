@@ -59,6 +59,12 @@ Important behaviors:
 6. Always provide context-rich responses that help users understand their relationship pipeline
 7. ALWAYS try to resolve names/companies yourself before asking the user for more information
 
+CRITICAL: Team Member ID Management
+8. BEFORE creating any interaction or note, ALWAYS use search_team_members to get valid team member IDs
+9. Use the first available team member ID from the search results
+10. NEVER use hardcoded or cached team member IDs - always fetch fresh data
+11. If no team members exist, inform the user they need to create a team member first
+
 Format responses in a business-friendly way with clear action items and next steps.`,
       model: "gpt-4o",
       tools: functions.map(func => ({ type: "function", function: func }))
