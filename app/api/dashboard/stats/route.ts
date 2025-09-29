@@ -29,14 +29,16 @@ export async function GET() {
     
     const nextWeek = new Date(today)
     nextWeek.setDate(nextWeek.getDate() + 7)
+    
+    const nextMonth = new Date(today)
+    nextMonth.setMonth(nextMonth.getMonth() + 1)
 
     const [
-      totalContacts,
       overdueContacts,
       dueTodayContacts,
-      dueThisWeekContacts
+      dueThisWeekContacts,
+      dueThisMonthContacts
     ] = await Promise.all([
-      prisma.contact.count(),
       prisma.contact.count({
         where: {
           nextReminderDate: {
@@ -59,14 +61,22 @@ export async function GET() {
             lt: nextWeek
           }
         }
+      }),
+      prisma.contact.count({
+        where: {
+          nextReminderDate: {
+            gte: today,
+            lt: nextMonth
+          }
+        }
       })
     ])
 
     return NextResponse.json({
-      totalContacts,
       overdueContacts,
       dueTodayContacts,
-      dueThisWeekContacts
+      dueThisWeekContacts,
+      dueThisMonthContacts
     })
   } catch {
     return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 })

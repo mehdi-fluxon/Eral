@@ -141,6 +141,11 @@ export async function GET(request: NextRequest) {
         case 'DUE_THIS_WEEK':
           where.nextReminderDate = { gte: today, lt: nextWeek }
           break
+        case 'DUE_THIS_MONTH':
+          const nextMonth = new Date(today)
+          nextMonth.setMonth(nextMonth.getMonth() + 1)
+          where.nextReminderDate = { gte: today, lt: nextMonth }
+          break
         case 'UPCOMING':
           where.nextReminderDate = { gte: tomorrow }
           break
@@ -167,7 +172,10 @@ export async function GET(request: NextRequest) {
             take: 1
           }
         },
-        orderBy: { updatedAt: 'desc' },
+        orderBy: [
+          { nextReminderDate: { sort: 'asc', nulls: 'last' } },
+          { updatedAt: 'desc' }
+        ],
         skip: offset,
         take: limit
       }),

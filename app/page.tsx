@@ -4,18 +4,18 @@ import { useState, useEffect } from 'react'
 import ContactList from './components/ContactList'
 
 interface DashboardStats {
-  totalContacts: number
   overdueContacts: number
   dueTodayContacts: number
   dueThisWeekContacts: number
+  dueThisMonthContacts: number
 }
 
 export default function Home() {
   const [stats, setStats] = useState<DashboardStats>({
-    totalContacts: 0,
     overdueContacts: 0,
     dueTodayContacts: 0,
-    dueThisWeekContacts: 0
+    dueThisWeekContacts: 0,
+    dueThisMonthContacts: 0
   })
   const [activeFilter, setActiveFilter] = useState<string | null>(null)
 
@@ -59,20 +59,6 @@ export default function Home() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Contacts</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalContacts}</p>
-            </div>
-          </div>
-        </div>
-        
         <button
           onClick={() => setActiveFilter(activeFilter === 'OVERDUE' ? null : 'OVERDUE')}
           className={`bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow text-left ${
@@ -126,6 +112,25 @@ export default function Home() {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Due This Week</p>
               <p className="text-2xl font-bold text-gray-900">{stats.dueThisWeekContacts}</p>
+            </div>
+          </div>
+        </button>
+        
+        <button
+          onClick={() => setActiveFilter(activeFilter === 'DUE_THIS_MONTH' ? null : 'DUE_THIS_MONTH')}
+          className={`bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow text-left ${
+            activeFilter === 'DUE_THIS_MONTH' ? 'ring-2 ring-blue-500 bg-blue-50' : ''
+          }`}
+        >
+          <div className="flex items-center">
+            <div className={`p-2 rounded-lg ${activeFilter === 'DUE_THIS_MONTH' ? 'bg-blue-200' : 'bg-blue-100'}`}>
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Due This Month</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.dueThisMonthContacts || 0}</p>
             </div>
           </div>
         </button>

@@ -76,13 +76,17 @@ export async function GET(request: NextRequest) {
 
     const members = await prisma.teamMember.findMany({
       where,
+      include: {
+        _count: {
+          select: {
+            contacts: true
+          }
+        }
+      },
       orderBy: { name: 'asc' }
     })
-    const membersWithCount = members.map(member => ({
-      ...member,
-      _count: { contacts: 0 }
-    }))
-    return NextResponse.json(membersWithCount)
+    
+    return NextResponse.json(members)
   } catch (error) {
     console.error('Failed to fetch team members:', error)
     return NextResponse.json({ error: 'Failed to fetch team members' }, { status: 500 })

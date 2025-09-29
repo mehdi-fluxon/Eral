@@ -21,13 +21,13 @@ const MessageRenderer = ({ content, role }: { content: string; role: 'user' | 'a
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
       .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
-      .replace(/^- (.+)$/gm, '<div class="ml-4 mb-1">• $1</div>') // Bullet points
-      .replace(/^• (.+)$/gm, '<div class="ml-4 mb-1">• $1</div>') // Bullet points
+      .replace(/^- (.+)$/gm, '<div class="ml-4">• $1</div>') // Bullet points
+      .replace(/^• (.+)$/gm, '<div class="ml-4">• $1</div>') // Bullet points
   }
 
   return (
     <div 
-      className="whitespace-pre-wrap prose prose-sm max-w-none"
+      className="whitespace-pre-wrap prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0"
       dangerouslySetInnerHTML={{ __html: formatText(content) }}
     />
   )
@@ -190,7 +190,7 @@ What would you like to do?`,
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                  🤖 LuxonAI Assistant
+                  🤖 LuxonAI Agent
                 </h1>
                 <p className="text-gray-600">
                   Manage your contacts using natural language. Ask me anything about your relationship pipeline!

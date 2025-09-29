@@ -1,5 +1,5 @@
 // Maps AI assistant function calls to actual API endpoints
-export async function executeFunction(functionName: string, parameters: any, baseUrl: string = 'http://localhost:3000') {
+export async function executeFunction(functionName: string, parameters: any, baseUrl: string = process.env.BASE_URL || 'http://localhost:3000') {
   
   try {
     switch (functionName) {

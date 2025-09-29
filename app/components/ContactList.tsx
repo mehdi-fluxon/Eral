@@ -139,6 +139,43 @@ export default function ContactList({ reminderFilter }: ContactListProps) {
     return new Date(dateString).toLocaleDateString()
   }
 
+  const getRelativeTime = (dateString: string | null) => {
+    if (!dateString) return ''
+    
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInMs = date.getTime() - now.getTime()
+    const diffInDays = Math.ceil(diffInMs / (1000 * 60 * 60 * 24))
+    
+    if (diffInDays < 0) {
+      const absdays = Math.abs(diffInDays)
+      if (absdays === 0) return 'today'
+      if (absdays === 1) return '1 day ago'
+      if (absdays < 7) return `${absdays} days ago`
+      if (absdays < 14) return '1 week ago'
+      if (absdays < 21) return '2 weeks ago'
+      if (absdays < 28) return '3 weeks ago'
+      if (absdays < 60) return '1 month ago'
+      return `${Math.floor(absdays / 30)} months ago`
+    } else if (diffInDays === 0) {
+      return 'today'
+    } else if (diffInDays === 1) {
+      return 'in 1 day'
+    } else if (diffInDays < 7) {
+      return `in ${diffInDays} days`
+    } else if (diffInDays < 14) {
+      return 'in 1 week'
+    } else if (diffInDays < 21) {
+      return 'in 2 weeks'
+    } else if (diffInDays < 28) {
+      return 'in 3 weeks'
+    } else if (diffInDays < 60) {
+      return 'in 1 month'
+    } else {
+      return `in ${Math.floor(diffInDays / 30)} months`
+    }
+  }
+
   if (loading && contacts.length === 0) {
     return <div className="text-center py-8">Loading contacts...</div>
   }
@@ -202,6 +239,8 @@ export default function ContactList({ reminderFilter }: ContactListProps) {
               <option value="">All Reminders</option>
               <option value="OVERDUE">Overdue</option>
               <option value="DUE_TODAY">Due Today</option>
+              <option value="DUE_THIS_WEEK">Due This Week</option>
+              <option value="DUE_THIS_MONTH">Due This Month</option>
               <option value="UPCOMING">Upcoming</option>
               <option value="NO_REMINDER">No Reminder</option>
             </select>
@@ -282,7 +321,14 @@ export default function ContactList({ reminderFilter }: ContactListProps) {
                   {formatDate(contact.lastTouchDate)}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-900">
-                  {formatDate(contact.nextReminderDate)}
+                  <div>
+                    <div>{formatDate(contact.nextReminderDate)}</div>
+                    {contact.nextReminderDate && (
+                      <div className="text-xs text-gray-500">
+                        {getRelativeTime(contact.nextReminderDate)}
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4">
                   <span className={`inline-block px-2 py-1 text-xs rounded ${getReminderBadgeColor(contact.reminderStatus)}`}>
