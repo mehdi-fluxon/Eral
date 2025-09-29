@@ -161,13 +161,34 @@ Format responses in a business-friendly way with clear action items and next ste
 
   async processMessage(threadId: string, userMessage: string) {
     try {
+      // Check if there's an active run on this thread
+      try {
+        const runs = await openai.beta.threads.runs.list(threadId, { limit: 1 })
+        const activeRun = runs.data.find(run => 
+          run.status === 'queued' || 
+          run.status === 'in_progress' || 
+          run.status === 'requires_action'
+        )
+        
+        if (activeRun) {
+          // Create a new thread if there's an active run
+          const newThread = await this.createThread()
+          threadId = newThread.id
+        }
+      } catch (error) {
+        console.log('Could not check thread status, creating new thread')
+        const newThread = await this.createThread()
+        threadId = newThread.id
+      }
+      
       await this.addMessage(threadId, userMessage)
       const result = await this.runAssistant(threadId)
       
       return {
         success: true,
         response: result.messages?.[0]?.content || 'I apologize, but I encountered an issue processing your request.',
-        status: result.status
+        status: result.status,
+        threadId: threadId
       }
     } catch (error) {
       console.error('Error processing message:', error)

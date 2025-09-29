@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ...result,
-      threadId: currentThreadId
+      threadId: result.threadId || currentThreadId
     })
   } catch (error) {
     console.error('AI Agent API error:', error)
