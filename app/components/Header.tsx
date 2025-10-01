@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 
@@ -50,10 +51,12 @@ export default function Header() {
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-3">
                   {session.user.image && (
-                    <img
+                    <Image
                       src={session.user.image}
-                      alt={session.user.name || ''}
-                      className="w-8 h-8 rounded-full"
+                      alt={session.user.name || 'User'}
+                      width={32}
+                      height={32}
+                      className="rounded-full"
                     />
                   )}
                   <span className="text-sm text-gray-700">{session.user.name}</span>
