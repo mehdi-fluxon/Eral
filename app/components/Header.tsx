@@ -2,9 +2,11 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import { useSession, signOut } from 'next-auth/react'
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { data: session } = useSession()
 
   return (
     <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
@@ -44,6 +46,26 @@ export default function Header() {
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
+            {session?.user && (
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-3">
+                  {session.user.image && (
+                    <img
+                      src={session.user.image}
+                      alt={session.user.name || ''}
+                      className="w-8 h-8 rounded-full"
+                    />
+                  )}
+                  <span className="text-sm text-gray-700">{session.user.name}</span>
+                </div>
+                <button
+                  onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+                  className="text-gray-700 hover:text-red-600 transition-colors font-medium"
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
             <Link href="/contacts" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm">
               Add Contact
             </Link>
@@ -80,6 +102,14 @@ export default function Header() {
               <Link href="/api-docs" className="block px-3 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-md transition-colors">
                 API Docs
               </Link>
+              {session?.user && (
+                <button
+                  onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+                  className="block w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                >
+                  Sign Out
+                </button>
+              )}
             </nav>
           </div>
         )}

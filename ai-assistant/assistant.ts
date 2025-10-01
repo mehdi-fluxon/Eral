@@ -165,17 +165,17 @@ Format responses in a business-friendly way with clear action items and next ste
     return this.waitForCompletion(threadId, runId)
   }
 
-  async processMessage(threadId: string, userMessage: string) {
+  async processMessage(threadId: string, userMessage: string, teamMemberId?: string) {
     try {
       // Check if there's an active run on this thread
       try {
         const runs = await openai.beta.threads.runs.list(threadId, { limit: 1 })
-        const activeRun = runs.data.find(run => 
-          run.status === 'queued' || 
-          run.status === 'in_progress' || 
+        const activeRun = runs.data.find(run =>
+          run.status === 'queued' ||
+          run.status === 'in_progress' ||
           run.status === 'requires_action'
         )
-        
+
         if (activeRun) {
           // Create a new thread if there's an active run
           const newThread = await this.createThread()
@@ -186,8 +186,14 @@ Format responses in a business-friendly way with clear action items and next ste
         const newThread = await this.createThread()
         threadId = newThread.id
       }
-      
-      await this.addMessage(threadId, userMessage)
+
+      // Add user context to the message if teamMemberId is provided
+      let contextualMessage = userMessage
+      if (teamMemberId) {
+        contextualMessage = `[User Context: The current user's team member ID is "${teamMemberId}". When searching contacts, ALWAYS filter by this team member ID automatically. Only show contacts owned by this team member unless explicitly asked otherwise.]\n\n${userMessage}`
+      }
+
+      await this.addMessage(threadId, contextualMessage)
       const result = await this.runAssistant(threadId)
       
       return {

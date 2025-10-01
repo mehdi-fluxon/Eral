@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { luxonAIAssistant } from '@/ai-assistant/assistant'
+import { auth } from '@/auth'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 /**
  * @swagger
@@ -51,6 +55,27 @@ import { luxonAIAssistant } from '@/ai-assistant/assistant'
 
 export async function POST(request: NextRequest) {
   try {
+    // Get current user session
+    const session = await auth()
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Get the team member ID for this user
+    const teamMember = await prisma.teamMember.findUnique({
+      where: { email: session.user.email }
+    })
+
+    if (!teamMember) {
+      return NextResponse.json(
+        { error: 'Team member not found for this user' },
+        { status: 404 }
+      )
+    }
+
     const { message, threadId } = await request.json()
 
     if (!message) {
@@ -67,8 +92,12 @@ export async function POST(request: NextRequest) {
       currentThreadId = thread.id
     }
 
-    // Process the message
-    const result = await luxonAIAssistant.processMessage(currentThreadId, message)
+    // Process the message with user context
+    const result = await luxonAIAssistant.processMessage(
+      currentThreadId,
+      message,
+      teamMember.id // Pass the team member ID as context
+    )
 
     return NextResponse.json({
       ...result,

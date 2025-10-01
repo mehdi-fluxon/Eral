@@ -1,10 +1,20 @@
 // Maps AI assistant function calls to actual API endpoints
 export async function executeFunction(functionName: string, parameters: any, baseUrl: string = process.env.BASE_URL || 'http://localhost:3000') {
-  
+
+  // Headers for internal API calls
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+
+  // Add internal API key for server-to-server authentication
+  if (process.env.INTERNAL_API_KEY) {
+    headers['x-internal-api-key'] = process.env.INTERNAL_API_KEY
+  }
+
   try {
     switch (functionName) {
       // ==================== CONTACTS ====================
-      
+
       case 'search_contacts': {
         const searchParams = new URLSearchParams()
         if (parameters.search) searchParams.append('search', parameters.search)
@@ -15,21 +25,21 @@ export async function executeFunction(functionName: string, parameters: any, bas
         if (parameters.page) searchParams.append('page', parameters.page.toString())
         if (parameters.limit) searchParams.append('limit', parameters.limit.toString())
 
-        const response = await fetch(`${baseUrl}/api/contacts?${searchParams}`)
+        const response = await fetch(`${baseUrl}/api/contacts?${searchParams}`, { headers })
         return await response.json()
       }
 
       case 'create_contact': {
         const response = await fetch(`${baseUrl}/api/contacts`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(parameters)
         })
         return await response.json()
       }
 
       case 'get_contact_by_id': {
-        const response = await fetch(`${baseUrl}/api/contacts/${parameters.id}`)
+        const response = await fetch(`${baseUrl}/api/contacts/${parameters.id}`, { headers })
         return await response.json()
       }
 
@@ -37,7 +47,7 @@ export async function executeFunction(functionName: string, parameters: any, bas
         const { id, ...updateData } = parameters
         const response = await fetch(`${baseUrl}/api/contacts/${id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(updateData)
         })
         return await response.json()
@@ -45,7 +55,8 @@ export async function executeFunction(functionName: string, parameters: any, bas
 
       case 'delete_contact': {
         const response = await fetch(`${baseUrl}/api/contacts/${parameters.id}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers
         })
         return await response.json()
       }
@@ -56,7 +67,7 @@ export async function executeFunction(functionName: string, parameters: any, bas
         const { contactId, ...noteData } = parameters
         const response = await fetch(`${baseUrl}/api/contacts/${contactId}/notes`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(noteData)
         })
         return await response.json()
@@ -64,18 +75,19 @@ export async function executeFunction(functionName: string, parameters: any, bas
 
       case 'delete_note': {
         const response = await fetch(`${baseUrl}/api/notes/${parameters.id}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers
         })
         return await response.json()
       }
 
       // ==================== INTERACTIONS ====================
-      
+
       case 'add_interaction_to_contact': {
         const { contactId, ...interactionData } = parameters
         const response = await fetch(`${baseUrl}/api/contacts/${contactId}/interactions`, {
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+          headers,
           body: JSON.stringify({
             ...interactionData,
             interactionDate: interactionData.interactionDate || new Date().toISOString().split('T')[0],
@@ -89,7 +101,7 @@ export async function executeFunction(functionName: string, parameters: any, bas
         const { id, ...updateData } = parameters
         const response = await fetch(`${baseUrl}/api/interactions/${id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(updateData)
         })
         return await response.json()
@@ -97,31 +109,32 @@ export async function executeFunction(functionName: string, parameters: any, bas
 
       case 'delete_interaction': {
         const response = await fetch(`${baseUrl}/api/interactions/${parameters.id}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers
         })
         return await response.json()
       }
 
       // ==================== TIMELINE ====================
-      
+
       case 'get_contact_timeline': {
-        const response = await fetch(`${baseUrl}/api/contacts/${parameters.contactId}/timeline`)
+        const response = await fetch(`${baseUrl}/api/contacts/${parameters.contactId}/timeline`, { headers })
         return await response.json()
       }
 
       // ==================== DASHBOARD ====================
-      
+
       case 'get_dashboard_stats': {
-        const response = await fetch(`${baseUrl}/api/dashboard/stats`)
+        const response = await fetch(`${baseUrl}/api/dashboard/stats`, { headers })
         return await response.json()
       }
 
       // ==================== COMPANIES ====================
-      
+
       case 'search_companies': {
         const searchParams = new URLSearchParams()
         if (parameters.search) searchParams.append('search', parameters.search)
-        const response = await fetch(`${baseUrl}/api/companies?${searchParams}`)
+        const response = await fetch(`${baseUrl}/api/companies?${searchParams}`, { headers })
         const data = await response.json()
         if (!response.ok) {
           throw new Error(data.error || `Failed to search companies: ${response.status}`)
@@ -132,7 +145,7 @@ export async function executeFunction(functionName: string, parameters: any, bas
       case 'create_company': {
         const response = await fetch(`${baseUrl}/api/companies`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(parameters)
         })
         const data = await response.json()
@@ -143,7 +156,7 @@ export async function executeFunction(functionName: string, parameters: any, bas
       }
 
       case 'get_company_by_id': {
-        const response = await fetch(`${baseUrl}/api/companies/${parameters.id}`)
+        const response = await fetch(`${baseUrl}/api/companies/${parameters.id}`, { headers })
         const data = await response.json()
         if (!response.ok) {
           throw new Error(data.error || `Failed to get company: ${response.status}`)
@@ -155,7 +168,7 @@ export async function executeFunction(functionName: string, parameters: any, bas
         const { id, ...updateData } = parameters
         const response = await fetch(`${baseUrl}/api/companies/${id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(updateData)
         })
         const data = await response.json()
@@ -167,7 +180,8 @@ export async function executeFunction(functionName: string, parameters: any, bas
 
       case 'delete_company': {
         const response = await fetch(`${baseUrl}/api/companies/${parameters.id}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers
         })
         const data = await response.json()
         if (!response.ok) {
@@ -177,18 +191,18 @@ export async function executeFunction(functionName: string, parameters: any, bas
       }
 
       // ==================== TEAM MEMBERS ====================
-      
+
       case 'search_team_members': {
         const searchParams = new URLSearchParams()
         if (parameters.search) searchParams.append('search', parameters.search)
-        const response = await fetch(`${baseUrl}/api/team-members?${searchParams}`)
+        const response = await fetch(`${baseUrl}/api/team-members?${searchParams}`, { headers })
         return await response.json()
       }
 
       case 'create_team_member': {
         const response = await fetch(`${baseUrl}/api/team-members`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(parameters)
         })
         return await response.json()
