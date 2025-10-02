@@ -15,13 +15,14 @@ export default function Header() {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-8">
             <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-              <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">L</span>
-              </div>
-              <div>
-                <span className="font-bold text-xl text-gray-900">LuxonAI</span>
-                <div className="text-xs text-gray-500">Intelligent Contact Management</div>
-              </div>
+              <Image
+                src="/logo.png"
+                alt="LuxonAI"
+                width={120}
+                height={40}
+                className="h-10 w-auto"
+                priority
+              />
             </Link>
             
             <nav className="hidden md:flex space-x-6">
