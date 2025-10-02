@@ -93,11 +93,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Process the message with user context
+    const startTime = Date.now()
     const result = await luxonAIAssistant.processMessage(
       currentThreadId,
       message,
       teamMember.id // Pass the team member ID as context
     )
+    const duration = Date.now() - startTime
+
+    // Log conversation for analytics
+    console.log(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      userId: session.user.id,
+      userEmail: session.user.email,
+      teamMemberId: teamMember.id,
+      threadId: currentThreadId,
+      question: message,
+      response: result.response || result.data,
+      status: result.status,
+      duration,
+      type: 'ai_conversation'
+    }))
 
     return NextResponse.json({
       ...result,
