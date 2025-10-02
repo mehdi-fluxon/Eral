@@ -9,7 +9,17 @@ export class SlackClient {
     this.client = new WebClient(process.env.SLACK_BOT_TOKEN)
   }
 
-  private extractTextFromBlocks(blocks: any[]): string {
+  private extractTextFromBlocks(blocks: Array<{
+    type: string
+    elements?: Array<{
+      type: string
+      elements?: Array<{
+        type: string
+        text?: string
+      }>
+    }>
+    text?: { text: string }
+  }>): string {
     let text = ''
 
     for (const block of blocks) {
@@ -31,7 +41,25 @@ export class SlackClient {
     return text.trim()
   }
 
-  async handleMessage(event: any) {
+  async handleMessage(event: {
+    bot_id?: string
+    thread_ts?: string
+    user: string
+    text?: string
+    blocks?: Array<{
+      type: string
+      elements?: Array<{
+        type: string
+        elements?: Array<{
+          type: string
+          text?: string
+        }>
+      }>
+      text?: { text: string }
+    }>
+    channel: string
+    ts: string
+  }) {
     try {
       // Ignore bot messages and messages in threads (for now)
       if (event.bot_id || event.thread_ts) {
