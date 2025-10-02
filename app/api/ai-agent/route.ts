@@ -109,8 +109,8 @@ export async function POST(request: NextRequest) {
       teamMemberId: teamMember.id,
       threadId: currentThreadId,
       question: message,
-      response: result.response || result.data,
-      status: result.status,
+      response: result.response,
+      status: result.success ? result.status : 'error',
       duration,
       type: 'ai_conversation'
     }))
