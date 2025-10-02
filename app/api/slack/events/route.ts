@@ -45,8 +45,11 @@ export async function POST(request: NextRequest) {
   try {
     const payload = await request.json()
 
+    console.log('Slack event received:', JSON.stringify(payload, null, 2))
+
     // Handle URL verification challenge
     if (payload.type === 'url_verification') {
+      console.log('Responding to URL verification with challenge:', payload.challenge)
       return NextResponse.json({ challenge: payload.challenge })
     }
 

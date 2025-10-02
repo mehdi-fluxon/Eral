@@ -6,10 +6,11 @@ export default auth((req) => {
   const isAuthPage = req.nextUrl.pathname.startsWith("/auth")
   const isApiAuth = req.nextUrl.pathname.startsWith("/api/auth")
   const isApiDocs = req.nextUrl.pathname.startsWith("/api/docs")
+  const isSlackWebhook = req.nextUrl.pathname.startsWith("/api/slack")
   const isApiRoute = req.nextUrl.pathname.startsWith("/api")
 
-  // Allow auth-related routes and API docs
-  if (isApiAuth || isAuthPage || isApiDocs) {
+  // Allow auth-related routes, API docs, and Slack webhooks (they have their own verification)
+  if (isApiAuth || isAuthPage || isApiDocs || isSlackWebhook) {
     return NextResponse.next()
   }
 
