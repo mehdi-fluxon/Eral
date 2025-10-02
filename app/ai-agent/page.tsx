@@ -10,24 +10,35 @@ interface Message {
   timestamp: Date
 }
 
-// Simple rich text renderer
+// Rich text renderer with full markdown support
 const MessageRenderer = ({ content, role }: { content: string; role: 'user' | 'assistant' }) => {
   if (role === 'user') {
-    return <div className="whitespace-pre-wrap">{content}</div>
+    return <div className="whitespace-pre-wrap leading-relaxed">{content}</div>
   }
 
   // Parse markdown-like formatting for assistant messages
   const formatText = (text: string) => {
     return text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
-      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
-      .replace(/^- (.+)$/gm, '<div class="ml-4">• $1</div>') // Bullet points
-      .replace(/^• (.+)$/gm, '<div class="ml-4">• $1</div>') // Bullet points
+      // Code blocks
+      .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre class="bg-gray-800 text-gray-100 p-3 rounded my-2 overflow-x-auto"><code>$2</code></pre>')
+      // Inline code
+      .replace(/`([^`]+)`/g, '<code class="bg-gray-200 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
+      // Bold
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
+      // Italic
+      .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
+      // Links
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-indigo-600 hover:underline" target="_blank" rel="noopener">$1</a>')
+      // Bullet points with tighter spacing
+      .replace(/^[•\-] (.+)$/gm, '<div class="ml-4 leading-snug">• $1</div>')
+      // Checkmarks
+      .replace(/✓/g, '<span class="text-green-600 font-bold">✓</span>')
+      .replace(/✗/g, '<span class="text-red-600 font-bold">✗</span>')
   }
 
   return (
-    <div 
-      className="whitespace-pre-wrap prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0"
+    <div
+      className="whitespace-pre-wrap leading-snug prose prose-sm max-w-none"
       dangerouslySetInnerHTML={{ __html: formatText(content) }}
     />
   )
@@ -95,11 +106,14 @@ Try asking me things like:
 • "Add John Smith from TechCorp as a new contact"
 • "I talked to Jane Smith and she was happy about our proposal, call her in 2 days"
 • "What are my follow-ups for this week?"
-• "Log a meeting with the CEO of Acme Corp about their expansion plans"
 
 What would you like to do?`,
       timestamp: new Date()
     }])
+  }
+
+  const handleQuickAction = (query: string) => {
+    setInput(query)
   }
 
   const sendMessage = async () => {
@@ -206,24 +220,24 @@ What would you like to do?`,
           </div>
 
           {/* Chat Interface */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col" style={{ height: 'calc(100vh - 320px)', minHeight: '500px' }}>
             {/* Messages */}
-            <div className="h-96 overflow-y-auto p-6 space-y-4">
+            <div className="flex-1 overflow-y-auto p-6 space-y-3">
               {messages.map((message) => (
                 <div
                   key={message.id}
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-3xl rounded-lg px-4 py-3 ${
+                    className={`max-w-3xl rounded-lg px-4 py-2.5 shadow-sm ${
                       message.role === 'user'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-gray-100 text-gray-900'
+                        ? 'bg-indigo-600 text-white shadow-indigo-100'
+                        : 'bg-gray-50 text-gray-900 shadow-gray-100 border border-gray-100'
                     }`}
                   >
                     <MessageRenderer content={message.content} role={message.role} />
                     <div
-                      className={`text-xs mt-2 ${
+                      className={`text-xs mt-1.5 ${
                         message.role === 'user' ? 'text-indigo-200' : 'text-gray-500'
                       }`}
                     >
@@ -232,42 +246,78 @@ What would you like to do?`,
                   </div>
                 </div>
               ))}
-              
+
               {isLoading && (
                 <div className="flex justify-start">
-                  <div className="bg-gray-100 text-gray-900 rounded-lg px-4 py-3">
+                  <div className="bg-gray-50 text-gray-900 rounded-lg px-4 py-3 shadow-sm border border-gray-100">
                     <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
-                      <span>Thinking...</span>
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                      <span className="text-sm text-gray-600">Thinking</span>
                     </div>
                   </div>
                 </div>
               )}
-              
+
               <div ref={messagesEndRef} />
             </div>
 
             {/* Input */}
-            <div className="border-t border-gray-200 p-4">
-              <div className="flex space-x-4">
+            <div className="border-t border-gray-200 p-4 bg-gray-50">
+              {/* Quick Action Buttons */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                <button
+                  onClick={() => handleQuickAction("Show me all overdue contacts")}
+                  disabled={isLoading}
+                  className="text-xs bg-white hover:bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full border border-indigo-200 transition-colors disabled:opacity-50"
+                >
+                  📅 Overdue contacts
+                </button>
+                <button
+                  onClick={() => handleQuickAction("What are my follow-ups for this week?")}
+                  disabled={isLoading}
+                  className="text-xs bg-white hover:bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full border border-indigo-200 transition-colors disabled:opacity-50"
+                >
+                  📋 This week
+                </button>
+                <button
+                  onClick={() => handleQuickAction("Show me dashboard stats")}
+                  disabled={isLoading}
+                  className="text-xs bg-white hover:bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full border border-indigo-200 transition-colors disabled:opacity-50"
+                >
+                  📊 Dashboard
+                </button>
+                <button
+                  onClick={() => handleQuickAction("Add a new contact")}
+                  disabled={isLoading}
+                  className="text-xs bg-white hover:bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full border border-indigo-200 transition-colors disabled:opacity-50"
+                >
+                  ➕ Add contact
+                </button>
+              </div>
+
+              <div className="flex space-x-3">
                 <div className="flex-1">
                   <textarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Ask me about your contacts... (e.g., 'Show me overdue contacts' or 'Add John Smith from TechCorp')"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                    placeholder="Ask me about your contacts..."
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none bg-white"
                     rows={2}
                     disabled={isLoading}
                   />
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-xs text-gray-500 mt-1.5">
                     Press Enter to send, Shift+Enter for new line
                   </div>
                 </div>
                 <button
                   onClick={sendMessage}
                   disabled={!input.trim() || isLoading}
-                  className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium transition-colors self-start"
+                  className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium transition-colors self-start shadow-sm"
                 >
                   {isLoading ? 'Sending...' : 'Send'}
                 </button>

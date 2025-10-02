@@ -69,9 +69,6 @@ export default function Header() {
                 </button>
               </div>
             )}
-            <Link href="/contacts" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm">
-              Add Contact
-            </Link>
           </div>
 
           <button 
