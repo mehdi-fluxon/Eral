@@ -9,10 +9,48 @@ export class SlackClient {
     this.client = new WebClient(process.env.SLACK_BOT_TOKEN)
   }
 
-  async handleMessage(event: { bot_id?: string; thread_ts?: string; user: string; text: string; channel: string; ts: string }) {
+  private extractTextFromBlocks(blocks: any[]): string {
+    let text = ''
+
+    for (const block of blocks) {
+      if (block.type === 'rich_text' && block.elements) {
+        for (const element of block.elements) {
+          if (element.type === 'rich_text_section' && element.elements) {
+            for (const item of element.elements) {
+              if (item.type === 'text' && item.text) {
+                text += item.text
+              }
+            }
+          }
+        }
+      } else if (block.type === 'section' && block.text && block.text.text) {
+        text += block.text.text
+      }
+    }
+
+    return text.trim()
+  }
+
+  async handleMessage(event: any) {
     try {
       // Ignore bot messages and messages in threads (for now)
       if (event.bot_id || event.thread_ts) {
+        return
+      }
+
+      // Extract text from Slack message (handle both text and blocks)
+      let messageText = event.text || ''
+
+      // If text is empty, try to extract from blocks (rich text format)
+      if (!messageText && event.blocks) {
+        messageText = this.extractTextFromBlocks(event.blocks)
+      }
+
+      console.log('Extracted message text:', messageText)
+
+      // If still no text, skip
+      if (!messageText || messageText.trim() === '') {
+        console.log('No text content in message, skipping')
         return
       }
 
@@ -25,7 +63,7 @@ export class SlackClient {
       }
 
       // Process message with AI agent
-      const result = await luxonAIAssistant.processMessage(threadId, event.text)
+      const result = await luxonAIAssistant.processMessage(threadId, messageText)
 
       // Format response for Slack
       const formattedResponse = this.formatResponseForSlack(result.response)
