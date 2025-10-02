@@ -66,7 +66,7 @@ CRITICAL: Team Member ID Management
 11. If no team members exist, inform the user they need to create a team member first
 
 Format responses in a business-friendly way with clear action items and next steps.`,
-      model: "gpt-4o",
+      model: "gpt-4o-mini",
       tools: functions.map(func => ({ type: "function", function: func }))
     })
 
@@ -144,6 +144,7 @@ Format responses in a business-friendly way with clear action items and next ste
 
       try {
         const result = await executeFunction(functionName, functionArgs)
+        console.log(`Function ${functionName} returned:`, JSON.stringify(result).substring(0, 500))
         toolOutputs.push({
           tool_call_id: toolCall.id,
           output: JSON.stringify(result)
@@ -182,7 +183,7 @@ Format responses in a business-friendly way with clear action items and next ste
           threadId = newThread.id
         }
       } catch (error) {
-        console.log('Could not check thread status, creating new thread')
+        console.log('Could not check thread status, creating new thread. Error:', error instanceof Error ? error.message : error)
         const newThread = await this.createThread()
         threadId = newThread.id
       }
@@ -190,7 +191,7 @@ Format responses in a business-friendly way with clear action items and next ste
       // Add user context to the message if teamMemberId is provided
       let contextualMessage = userMessage
       if (teamMemberId) {
-        contextualMessage = `[User Context: The current user's team member ID is "${teamMemberId}". When searching contacts, ALWAYS filter by this team member ID automatically. Only show contacts owned by this team member unless explicitly asked otherwise.]\n\n${userMessage}`
+        contextualMessage = `[User Context: The current user's team member ID is "${teamMemberId}". Use this ID when creating new contacts, interactions, or notes. When searching contacts, search ALL contacts across all team members unless the user specifically asks to filter by a team member.]\n\n${userMessage}`
       }
 
       await this.addMessage(threadId, contextualMessage)

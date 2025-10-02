@@ -145,8 +145,8 @@ What would you like to do?`,
       const data = await response.json()
 
       if (data.success) {
-        // Update thread ID if this is first message
-        if (data.threadId && !threadId) {
+        // Always update thread ID from response (handles thread recreation)
+        if (data.threadId && data.threadId !== threadId) {
           setThreadId(data.threadId)
         }
 

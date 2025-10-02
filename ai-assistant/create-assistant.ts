@@ -673,7 +673,7 @@ Remember: Your goal is to make contact management effortless through intelligent
   const assistant = await openai.beta.assistants.create({
     name: "LuxonAI Contact Manager",
     instructions: instructions,
-    model: "gpt-4o",
+    model: "gpt-4o-mini",
     tools: functions.map(func => ({ type: "function" as const, function: func }))
   })
 
