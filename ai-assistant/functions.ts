@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { tool } from '@openai/agents'
+import { API_SCHEMA, validateResults } from './api-schema'
 
 // Base URL for API calls
 const baseUrl = process.env.BASE_URL || 'http://localhost:3000'
@@ -30,6 +31,8 @@ export async function executeFunction(functionName: string, parameters: any) {
         const searchParams = new URLSearchParams()
         if (parameters.search) searchParams.append('search', parameters.search)
         if (parameters.reminderStatus) searchParams.append('reminderStatus', parameters.reminderStatus)
+        if (parameters.startDate) searchParams.append('startDate', parameters.startDate)
+        if (parameters.endDate) searchParams.append('endDate', parameters.endDate)
         if (parameters.teamMember) searchParams.append('teamMember', parameters.teamMember)
         if (parameters.cadence) searchParams.append('cadence', parameters.cadence)
         if (parameters.company) searchParams.append('company', parameters.company)
@@ -238,8 +241,18 @@ export function generateAgentTools() {
     // ==================== CONTACTS ====================
     tool({
       name: "search_contacts",
-      description: "Search and filter contacts with pagination. Use this to find contacts by name, company, reminder status, etc. All parameters have defaults and can be omitted.",
-      parameters: z.object({}),
+      description: "Search and filter contacts with pagination. PREFERRED: Use startDate/endDate for precise date filtering instead of reminderStatus enums. Calculate dates yourself and pass them directly.",
+      parameters: z.object({
+        search: z.string().nullable().optional().describe("Free-text search across name, email, job title, labels, company, team member"),
+        startDate: z.string().nullable().optional().describe("Filter contacts with nextReminderDate >= this date (YYYY-MM-DD). Use this for custom date ranges"),
+        endDate: z.string().nullable().optional().describe("Filter contacts with nextReminderDate <= this date (YYYY-MM-DD). Use this for custom date ranges"),
+        reminderStatus: z.enum(["OVERDUE", "DUE_TODAY", "DUE_THIS_WEEK", "UPCOMING", "NO_REMINDER"]).nullable().optional().describe("Preset filter - only use if startDate/endDate don't fit"),
+        teamMember: z.string().nullable().optional().describe("Filter by team member ID"),
+        cadence: z.string().nullable().optional().describe("Filter by cadence value"),
+        company: z.string().nullable().optional().describe("Filter by company ID"),
+        page: z.number().nullable().optional().describe("Page number for pagination"),
+        limit: z.number().nullable().optional().describe("Results per page (max 100, default 50)")
+      }),
       execute: async (args: any) => executeFunction('search_contacts', args)
     }),
     tool({
@@ -306,11 +319,12 @@ export function generateAgentTools() {
 
     tool({
       name: "add_note_to_contact",
-      description: "Add a note to a contact. This automatically updates the last touch date and recalculates reminders.",
+      description: "Add a note to a contact. This automatically updates the last touch date and recalculates reminders. Use noteDate parameter for historical notes.",
       parameters: z.object({
         contactId: z.string().describe("Contact ID"),
         content: z.string().describe("Note content with rich text support"),
-        teamMemberId: z.string().describe("ID of team member creating the note")
+        teamMemberId: z.string().describe("ID of team member creating the note"),
+        noteDate: z.string().nullable().optional().describe("Note date (YYYY-MM-DD) - use this for historical notes, defaults to today")
       }),
       execute: async (args: any) => executeFunction('add_note_to_contact', args)
     }),
@@ -457,5 +471,95 @@ export function generateAgentTools() {
       }),
       execute: async (args: any) => executeFunction('create_team_member', args)
     }),
+
+    // ==================== REASONING & VALIDATION TOOLS ====================
+
+    tool({
+      name: "query_api_schema",
+      description: "Query the API schema to understand capabilities, filters, date logic, and constraints. Use this BEFORE making complex queries to understand what filters to use.",
+      parameters: z.object({
+        query: z.string().describe("What you want to know about the API (e.g., 'how to filter for this week', 'what filters are available for contacts', 'how does DUE_THIS_WEEK work')")
+      }),
+      execute: async (args: any) => {
+        const query = args.query.toLowerCase()
+
+        // Return relevant schema sections based on query
+        if (query.includes('this week') || query.includes('date') || query.includes('filter')) {
+          return {
+            reminderStatusFilters: API_SCHEMA.contacts.search.filters.reminderStatus,
+            dateLogic: API_SCHEMA.dateLogic,
+            examples: API_SCHEMA.contacts.search.filters.reminderStatus.examples
+          }
+        }
+
+        if (query.includes('field') || query.includes('parameter')) {
+          return {
+            searchFilters: API_SCHEMA.contacts.search.filters,
+            createFields: API_SCHEMA.contacts.create,
+            updateFields: API_SCHEMA.contacts.update
+          }
+        }
+
+        // Return full schema if general query
+        return API_SCHEMA
+      }
+    }),
+
+    tool({
+      name: "calculate_date_range",
+      description: "Calculate exact start/end dates for natural language time periods. Returns dates in YYYY-MM-DD format to use with startDate/endDate parameters.",
+      parameters: z.object({
+        period: z.enum(["today", "this_week", "this_month", "next_week", "next_month", "next_30_days", "overdue"]).describe("Time period to calculate")
+      }),
+      execute: async (args: any) => {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+
+        const formatDate = (date: Date) => date.toISOString().split('T')[0]
+
+        const ranges: Record<string, any> = {
+          today: {
+            startDate: formatDate(today),
+            endDate: formatDate(today),
+            description: "Only today"
+          },
+          this_week: {
+            startDate: formatDate(today),
+            endDate: formatDate(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)),
+            description: "Today through next 7 days"
+          },
+          this_month: {
+            startDate: formatDate(today),
+            endDate: formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 0)),
+            description: "Today through end of current month"
+          },
+          next_week: {
+            startDate: formatDate(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)),
+            endDate: formatDate(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000)),
+            description: "7-14 days from now"
+          },
+          next_month: {
+            startDate: formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 1)),
+            endDate: formatDate(new Date(today.getFullYear(), today.getMonth() + 2, 0)),
+            description: "Next calendar month"
+          },
+          next_30_days: {
+            startDate: formatDate(today),
+            endDate: formatDate(new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)),
+            description: "Next 30 days from today"
+          },
+          overdue: {
+            endDate: formatDate(new Date(today.getTime() - 24 * 60 * 60 * 1000)),
+            description: "Before today (overdue)",
+            note: "Only use endDate, no startDate"
+          }
+        }
+
+        return ranges[args.period] || { error: "Unknown period" }
+      }
+    }),
+
+
+
   ]
 }

@@ -54,16 +54,29 @@ Critical: BE PROACTIVE AND AUTONOMOUS
    - Only ask for clarification if multiple matches or not found
 
 Important behaviors:
-1. When adding notes or interactions, ALWAYS update the contact's last touch date and recalculate reminders
-2. For custom timing requests (like "call me in 2 days"), use update_contact to set nextReminderDate
-3. Parse sentiment and outcomes from interaction descriptions (positive, negative, follow-up needed)
-4. Be proactive in suggesting next actions based on interaction outcomes
-5. When searching contacts, use appropriate filters (reminderStatus for "overdue", "due today", etc.)
-6. Always provide context-rich responses that help users understand their relationship pipeline
+1. When searching for contacts by name/person:
+   - ONLY use the 'search' parameter with the person's name
+   - NEVER add date filters (startDate/endDate/reminderStatus) when searching by name
+   - Example: "talked to micha yesterday" → search_contacts(search="micha") then add interaction with yesterday's date
+
+2. When adding notes or interactions WITH temporal references (yesterday, last week, 2 days ago, last quarter, etc.):
+   - Calculate the date yourself based on the current date provided in the context
+   - For notes: Pass the calculated date in noteDate parameter → add_note_to_contact(noteDate="2025-10-01")
+   - For interactions: Pass the calculated date in interactionDate parameter → add_interaction_to_contact(interactionDate="2025-10-01")
+   - Example: User says "talked yesterday" and context says today is 2025-10-02 → calculate yesterday = 2025-10-01
+   - ALWAYS use YYYY-MM-DD format for dates
+
+3. When searching for contacts by TIME/REMINDER (overdue, this week, upcoming):
+   - Use calculate_date_range to get exact dates
+   - Pass startDate/endDate to search_contacts
+   - Example: "show me contacts due this week" → calculate_date_range("this_week") → search_contacts(startDate="...", endDate="...")
+
+4. When adding notes/interactions, ALWAYS update the contact's last touch date and recalculate reminders
+5. For custom timing requests (like "call me in 2 days"), calculate the future date and use update_contact with nextReminderDate
+6. Parse sentiment and outcomes from interaction descriptions (positive, negative, follow-up needed)
 7. ALWAYS try to resolve names/companies yourself before asking the user for more information
 8. When updating a contact, ONLY include fields you want to change - do NOT pass null/empty values for companyIds or teamMemberIds unless explicitly removing them
-9. When presenting follow-up results, ALWAYS maintain chronological order by date (earliest date first) within each category (Overdue, Due Today, Upcoming, etc.)
-10. When user asks for follow-ups within a timeframe (this week, this month, this quarter, next 30 days, etc.), ALWAYS EXCLUDE overdue items unless explicitly asked for - only show items from today forward. Use appropriate filters or post-process results to match the requested timeframe
+9. Always use limit=100 for searches to get complete results
 
 CRITICAL: Team Member ID Management
 9. When creating a NEW contact, ALWAYS assign it to the current user's team member ID (from context) unless user explicitly specifies a different team member
@@ -73,14 +86,17 @@ CRITICAL: Team Member ID Management
 13. If no team members exist, inform the user they need to create a team member first
 
 Response Formatting Guidelines:
-- Keep responses concise and scannable
-- Use clean markdown formatting with proper spacing
-- For contact lists: show only essential info (name, email, reminder date, company if relevant)
-- Avoid excessive notes/details unless specifically requested
-- Use bullet points instead of long paragraphs
-- Limit "Next Steps" suggestions to 1-2 most important items
-- Don't repeat information that's already shown
-- Group similar items together logically`,
+- BE EXTREMELY CONCISE - use minimal words
+- For contact lists: format as clean markdown with proper line breaks
+- Use this format for each contact:
+  **Name** - email (or "no email" if missing)
+  Next: YYYY-MM-DD
+- DO NOT include notes in follow-up lists - they are irrelevant to reminders
+- PRESERVE the order returned by the API - it's already sorted by closest reminder first
+- Separate contacts with blank line
+- NO "Next Steps" or suggestions unless explicitly asked
+- NO introductions like "Here are your follow-ups"
+- When contact info is incomplete (missing email, no next date), use descriptive placeholders like "no email" or "no reminder set" instead of generic "unknown"`,
       model: "gpt-4o-mini",
       tools: tools
     })
@@ -97,11 +113,15 @@ Response Formatting Guidelines:
       // Get previous conversation history
       const previousHistory = userConversationHistories.get(userId) || []
 
-      // Add user context to the message if teamMemberId is provided
-      let contextualMessage = userMessage
+      // Add user context to the message
+      const currentDate = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+      let contextualMessage = `[Context: Today's date is ${currentDate}.`
+
       if (teamMemberId) {
-        contextualMessage = `[User Context: The current user's team member ID is "${teamMemberId}". Use this ID when creating new contacts, interactions, or notes. When searching contacts, search ALL contacts across all team members unless the user specifically asks to filter by a team member.]\n\n${userMessage}`
+        contextualMessage += ` The current user's team member ID is "${teamMemberId}". Use this ID when creating new contacts, interactions, or notes. When searching contacts, search ALL contacts across all team members unless the user specifically asks to filter by a team member.`
       }
+
+      contextualMessage += `]\n\n${userMessage}`
 
       // Build input: previous history + new message
       const input = previousHistory.length > 0

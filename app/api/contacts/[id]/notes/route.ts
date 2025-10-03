@@ -43,7 +43,7 @@ export async function POST(
 ) {
   try {
     const { id: contactId } = await params
-    const { content, teamMemberId } = await request.json()
+    const { content, teamMemberId, noteDate } = await request.json()
 
     if (!content || !teamMemberId) {
       return NextResponse.json(
@@ -52,14 +52,18 @@ export async function POST(
       )
     }
 
+    // Use provided noteDate or default to now
+    const timestamp = noteDate ? new Date(noteDate) : new Date()
+
     // Create note and update contact's lastTouchDate in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Create the note
+      // Create the note with custom timestamp
       const note = await tx.note.create({
         data: {
           contactId,
           teamMemberId,
-          content
+          content,
+          createdAt: timestamp
         },
         include: {
           teamMember: true
@@ -72,7 +76,7 @@ export async function POST(
       })
 
       if (contact) {
-        const now = new Date()
+        const now = timestamp
         const nextReminderDate = new Date(now)
         
         // Calculate next reminder based on cadence

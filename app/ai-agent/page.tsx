@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useToast } from '@/app/hooks/useToast'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface Message {
   id: string
@@ -16,31 +18,32 @@ const MessageRenderer = ({ content, role }: { content: string; role: 'user' | 'a
     return <div className="whitespace-pre-wrap leading-relaxed">{content}</div>
   }
 
-  // Parse markdown-like formatting for assistant messages
-  const formatText = (text: string) => {
-    return text
-      // Code blocks
-      .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre class="bg-gray-800 text-gray-100 p-3 rounded my-2 overflow-x-auto"><code>$2</code></pre>')
-      // Inline code
-      .replace(/`([^`]+)`/g, '<code class="bg-gray-200 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
-      // Bold
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
-      // Italic
-      .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
-      // Links
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-indigo-600 hover:underline" target="_blank" rel="noopener">$1</a>')
-      // Bullet points with tighter spacing
-      .replace(/^[•\-] (.+)$/gm, '<div class="ml-4 leading-snug">• $1</div>')
-      // Checkmarks
-      .replace(/✓/g, '<span class="text-green-600 font-bold">✓</span>')
-      .replace(/✗/g, '<span class="text-red-600 font-bold">✗</span>')
-  }
-
   return (
-    <div
-      className="whitespace-pre-wrap leading-snug prose prose-sm max-w-none"
-      dangerouslySetInnerHTML={{ __html: formatText(content) }}
-    />
+    <div className="markdown-content leading-tight">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+        ul: ({ ...props }) => <ul className="list-disc ml-4 space-y-0.5" {...props} />,
+        ol: ({ ...props }) => <ol className="list-decimal ml-4 space-y-0.5" {...props} />,
+        li: ({ ...props }) => <li className="my-0" {...props} />,
+        p: ({ ...props }) => <p className="my-1" {...props} />,
+        h1: ({ ...props }) => <h1 className="text-xl font-bold my-2" {...props} />,
+        h2: ({ ...props }) => <h2 className="text-lg font-bold my-2" {...props} />,
+        h3: ({ ...props }) => <h3 className="text-base font-semibold my-1.5" {...props} />,
+        code: ({ inline, ...props }: any) =>
+          inline ? (
+            <code className="bg-gray-200 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props} />
+          ) : (
+            <code className="block bg-gray-800 text-gray-100 p-3 rounded my-2 overflow-x-auto" {...props} />
+          ),
+        a: ({ ...props }) => <a className="text-indigo-600 hover:underline" target="_blank" rel="noopener" {...props} />,
+        strong: ({ ...props }) => <strong className="font-semibold" {...props} />,
+        em: ({ ...props }) => <em className="italic" {...props} />,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
   )
 }
 

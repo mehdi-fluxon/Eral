@@ -173,17 +173,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       nextReminder = calculateNextReminderDate(touchDate, newCadence)
     }
 
-    const updateData: Prisma.ContactUpdateInput = {
-      name,
-      email,
-      jobTitle: jobTitle !== undefined ? (jobTitle || null) : undefined,
-      linkedinUrl: linkedinUrl !== undefined ? (linkedinUrl || null) : undefined,
-      referrer: referrer !== undefined ? (referrer || null) : undefined,
-      labels: labels !== undefined ? (labels || null) : undefined,
-      crmId: crmId !== undefined ? (crmId || null) : undefined,
-      generalNotes: generalNotes !== undefined ? generalNotes : undefined,
-      customFields: customFields !== undefined ? customFields : undefined,
-    }
+    const updateData: Prisma.ContactUpdateInput = {}
+
+    if (name) updateData.name = name
+    if (email) updateData.email = email
+    if (jobTitle !== undefined) updateData.jobTitle = jobTitle || null
+    if (linkedinUrl !== undefined) updateData.linkedinUrl = linkedinUrl || null
+    if (referrer !== undefined) updateData.referrer = referrer || null
+    if (labels !== undefined) updateData.labels = labels || null
+    if (crmId !== undefined) updateData.crmId = crmId || null
+    if (generalNotes !== undefined) updateData.generalNotes = generalNotes
+    if (customFields !== undefined) updateData.customFields = customFields
 
     if (cadence) {
       updateData.cadence = cadence

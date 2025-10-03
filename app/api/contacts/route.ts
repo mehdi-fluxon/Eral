@@ -95,6 +95,8 @@ export async function GET(request: NextRequest) {
     const cadenceFilter = searchParams.get('cadence') || ''
     const companyFilter = searchParams.get('company') || ''
     const reminderStatusFilter = searchParams.get('reminderStatus') || ''
+    const startDate = searchParams.get('startDate') || ''
+    const endDate = searchParams.get('endDate') || ''
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
 
@@ -123,7 +125,24 @@ export async function GET(request: NextRequest) {
       where.companies = { some: { companyId: companyFilter } }
     }
 
-    if (reminderStatusFilter) {
+    // Custom date range filter (takes precedence over reminderStatusFilter)
+    if (startDate && endDate) {
+      const start = new Date(startDate)
+      start.setHours(0, 0, 0, 0)
+      const end = new Date(endDate)
+      end.setHours(23, 59, 59, 999)
+
+      where.nextReminderDate = { gte: start, lte: end }
+    } else if (startDate) {
+      const start = new Date(startDate)
+      start.setHours(0, 0, 0, 0)
+      where.nextReminderDate = { gte: start }
+    } else if (endDate) {
+      const end = new Date(endDate)
+      end.setHours(23, 59, 59, 999)
+      where.nextReminderDate = { lte: end }
+    } else if (reminderStatusFilter) {
+      // Fallback to preset filters if no custom date range
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const tomorrow = new Date(today)
@@ -139,7 +158,7 @@ export async function GET(request: NextRequest) {
           where.nextReminderDate = { gte: today, lt: tomorrow }
           break
         case 'DUE_THIS_WEEK':
-          where.nextReminderDate = { gte: today, lt: nextWeek }
+          where.nextReminderDate = { gte: tomorrow, lt: nextWeek }
           break
         case 'DUE_THIS_MONTH':
           const nextMonth = new Date(today)
