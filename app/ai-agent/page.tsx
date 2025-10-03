@@ -30,7 +30,7 @@ const MessageRenderer = ({ content, role }: { content: string; role: 'user' | 'a
         h1: ({ ...props }) => <h1 className="text-xl font-bold my-2" {...props} />,
         h2: ({ ...props }) => <h2 className="text-lg font-bold my-2" {...props} />,
         h3: ({ ...props }) => <h3 className="text-base font-semibold my-1.5" {...props} />,
-        code: ({ inline, ...props }: any) =>
+        code: ({ inline, ...props }: React.HTMLAttributes<HTMLElement> & { inline?: boolean }) =>
           inline ? (
             <code className="bg-gray-200 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props} />
           ) : (
