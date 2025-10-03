@@ -86,6 +86,8 @@ export class SlackClient {
     thread_ts?: string
     user: string
     text?: string
+    type?: string
+    channel_type?: string
     blocks?: Array<{
       type: string
       elements?: Array<{
@@ -101,8 +103,20 @@ export class SlackClient {
     ts: string
   }) {
     try {
-      // Ignore bot messages and messages in threads (for now)
-      if (event.bot_id || event.thread_ts) {
+      // Ignore bot messages
+      if (event.bot_id) {
+        return
+      }
+
+      // Only respond to:
+      // 1. app_mention events (when bot is @mentioned)
+      // 2. Direct messages (channel_type === 'im')
+      // Ignore regular channel messages without mention
+      const isAppMention = event.type === 'app_mention'
+      const isDirectMessage = event.channel_type === 'im' || event.channel?.startsWith('D')
+
+      if (!isAppMention && !isDirectMessage) {
+        console.log('Ignoring message - not a mention or DM')
         return
       }
 

@@ -128,17 +128,35 @@ export async function GET(request: NextRequest) {
     // Custom date range filter (takes precedence over reminderStatusFilter)
     if (startDate && endDate) {
       const start = new Date(startDate)
-      start.setHours(0, 0, 0, 0)
       const end = new Date(endDate)
+
+      // Validate dates
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return NextResponse.json({ error: 'Invalid date format for startDate or endDate' }, { status: 400 })
+      }
+
+      start.setHours(0, 0, 0, 0)
       end.setHours(23, 59, 59, 999)
 
       where.nextReminderDate = { gte: start, lte: end }
     } else if (startDate) {
       const start = new Date(startDate)
+
+      // Validate date
+      if (isNaN(start.getTime())) {
+        return NextResponse.json({ error: 'Invalid date format for startDate' }, { status: 400 })
+      }
+
       start.setHours(0, 0, 0, 0)
       where.nextReminderDate = { gte: start }
     } else if (endDate) {
       const end = new Date(endDate)
+
+      // Validate date
+      if (isNaN(end.getTime())) {
+        return NextResponse.json({ error: 'Invalid date format for endDate' }, { status: 400 })
+      }
+
       end.setHours(23, 59, 59, 999)
       where.nextReminderDate = { lte: end }
     } else if (reminderStatusFilter) {

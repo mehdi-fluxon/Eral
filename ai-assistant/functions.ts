@@ -29,13 +29,26 @@ export async function executeFunction(functionName: string, parameters: any) {
 
       case 'search_contacts': {
         const searchParams = new URLSearchParams()
-        if (parameters.search) searchParams.append('search', parameters.search)
-        if (parameters.reminderStatus) searchParams.append('reminderStatus', parameters.reminderStatus)
-        if (parameters.startDate) searchParams.append('startDate', parameters.startDate)
-        if (parameters.endDate) searchParams.append('endDate', parameters.endDate)
-        if (parameters.teamMember) searchParams.append('teamMember', parameters.teamMember)
-        if (parameters.cadence) searchParams.append('cadence', parameters.cadence)
-        if (parameters.company) searchParams.append('company', parameters.company)
+        if (parameters.search && parameters.search.trim()) searchParams.append('search', parameters.search)
+        if (parameters.reminderStatus && parameters.reminderStatus.trim()) searchParams.append('reminderStatus', parameters.reminderStatus)
+
+        // Validate and append dates only if they're valid
+        if (parameters.startDate && parameters.startDate.trim() && parameters.startDate !== '.') {
+          const startDate = new Date(parameters.startDate)
+          if (!isNaN(startDate.getTime())) {
+            searchParams.append('startDate', parameters.startDate)
+          }
+        }
+        if (parameters.endDate && parameters.endDate.trim() && parameters.endDate !== '.') {
+          const endDate = new Date(parameters.endDate)
+          if (!isNaN(endDate.getTime())) {
+            searchParams.append('endDate', parameters.endDate)
+          }
+        }
+
+        if (parameters.teamMember && parameters.teamMember.trim() && parameters.teamMember !== '.') searchParams.append('teamMember', parameters.teamMember)
+        if (parameters.cadence && parameters.cadence.trim() && parameters.cadence !== '.') searchParams.append('cadence', parameters.cadence)
+        if (parameters.company && parameters.company.trim() && parameters.company !== '.') searchParams.append('company', parameters.company)
         if (parameters.page) searchParams.append('page', parameters.page.toString())
         if (parameters.limit) searchParams.append('limit', parameters.limit.toString())
 
@@ -241,15 +254,15 @@ export function generateAgentTools() {
     // ==================== CONTACTS ====================
     tool({
       name: "search_contacts",
-      description: "Search and filter contacts with pagination. PREFERRED: Use startDate/endDate for precise date filtering instead of reminderStatus enums. Calculate dates yourself and pass them directly.",
+      description: "Search and filter contacts with pagination. PREFERRED: Use startDate/endDate for precise date filtering instead of reminderStatus enums. Calculate dates yourself and pass them directly. IMPORTANT: Only pass date parameters if you have valid YYYY-MM-DD formatted dates. Do not pass empty strings, dots, or placeholder values.",
       parameters: z.object({
         search: z.string().nullable().optional().describe("Free-text search across name, email, job title, labels, company, team member"),
-        startDate: z.string().nullable().optional().describe("Filter contacts with nextReminderDate >= this date (YYYY-MM-DD). Use this for custom date ranges"),
-        endDate: z.string().nullable().optional().describe("Filter contacts with nextReminderDate <= this date (YYYY-MM-DD). Use this for custom date ranges"),
+        startDate: z.string().nullable().optional().describe("Filter contacts with nextReminderDate >= this date (YYYY-MM-DD format ONLY). Must be a valid date or omit this parameter entirely"),
+        endDate: z.string().nullable().optional().describe("Filter contacts with nextReminderDate <= this date (YYYY-MM-DD format ONLY). Must be a valid date or omit this parameter entirely"),
         reminderStatus: z.enum(["OVERDUE", "DUE_TODAY", "DUE_THIS_WEEK", "UPCOMING", "NO_REMINDER"]).nullable().optional().describe("Preset filter - only use if startDate/endDate don't fit"),
-        teamMember: z.string().nullable().optional().describe("Filter by team member ID"),
-        cadence: z.string().nullable().optional().describe("Filter by cadence value"),
-        company: z.string().nullable().optional().describe("Filter by company ID"),
+        teamMember: z.string().nullable().optional().describe("Filter by team member ID (valid UUID only, do not pass placeholder values like '.')"),
+        cadence: z.string().nullable().optional().describe("Filter by cadence value (valid cadence enum only)"),
+        company: z.string().nullable().optional().describe("Filter by company ID (valid UUID only, do not pass placeholder values like '.')"),
         page: z.number().nullable().optional().describe("Page number for pagination"),
         limit: z.number().nullable().optional().describe("Results per page (max 100, default 50)")
       }),
