@@ -1,7 +1,11 @@
-// Maps AI assistant function calls to actual API endpoints
-export async function executeFunction(functionName: string, parameters: any, baseUrl: string = process.env.BASE_URL || 'http://localhost:3000') {
+import { z } from 'zod'
+import { tool } from '@openai/agents'
 
-  // Headers for internal API calls
+// Base URL for API calls
+const baseUrl = process.env.BASE_URL || 'http://localhost:3000'
+
+// Headers for internal API calls
+const getHeaders = () => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
@@ -10,6 +14,13 @@ export async function executeFunction(functionName: string, parameters: any, bas
   if (process.env.INTERNAL_API_KEY) {
     headers['x-internal-api-key'] = process.env.INTERNAL_API_KEY
   }
+
+  return headers
+}
+
+// Maps AI assistant function calls to actual API endpoints
+export async function executeFunction(functionName: string, parameters: any) {
+  const headers = getHeaders()
 
   try {
     switch (functionName) {
@@ -62,7 +73,7 @@ export async function executeFunction(functionName: string, parameters: any, bas
       }
 
       // ==================== NOTES ====================
-      
+
       case 'add_note_to_contact': {
         const { contactId, ...noteData } = parameters
         const response = await fetch(`${baseUrl}/api/contacts/${contactId}/notes`, {
@@ -217,548 +228,234 @@ export async function executeFunction(functionName: string, parameters: any, bas
   }
 }
 
-// Generate OpenAI function definitions
-export function generateOpenAIFunctions() {
-  const functions = []
-  
-  // ==================== CONTACTS ====================
-  
-  functions.push({
-    name: "search_contacts",
-    description: "Search and filter contacts with pagination. Use this to find contacts by name, company, reminder status, etc.",
-    parameters: {
-      type: "object",
-      properties: {
-        search: {
-          type: "string",
-          description: "Search by name, email, job title, labels, company, or team member"
-        },
-        reminderStatus: {
-          type: "string",
-          enum: ["OVERDUE", "DUE_TODAY", "DUE_THIS_WEEK", "UPCOMING", "NO_REMINDER"],
-          description: "Filter by reminder status"
-        },
-        teamMember: {
-          type: "string", 
-          description: "Filter by team member ID"
-        },
-        cadence: {
-          type: "string",
-          enum: ["1_DAY", "2_DAYS", "3_DAYS", "5_DAYS", "7_DAYS", "2_WEEKS", "3_WEEKS", "1_MONTH", "2_MONTHS", "3_MONTHS", "6_MONTHS", "9_MONTHS", "12_MONTHS", "18_MONTHS", "24_MONTHS"],
-          description: "Filter by cadence frequency"
-        },
-        company: {
-          type: "string",
-          description: "Filter by company ID"
-        },
-        page: {
-          type: "integer",
-          minimum: 1,
-          default: 1,
-          description: "Page number for pagination"
-        },
-        limit: {
-          type: "integer", 
-          minimum: 1,
-          maximum: 100,
-          default: 50,
-          description: "Number of contacts per page"
-        }
-      }
-    }
-  })
+// Generate Agent tools for Agents SDK
+export function generateAgentTools() {
+  const cadenceEnum = z.enum(["1_DAY", "2_DAYS", "3_DAYS", "5_DAYS", "7_DAYS", "2_WEEKS", "3_WEEKS", "1_MONTH", "2_MONTHS", "3_MONTHS", "6_MONTHS", "9_MONTHS", "12_MONTHS", "18_MONTHS", "24_MONTHS"])
+  const reminderStatusEnum = z.enum(["OVERDUE", "DUE_TODAY", "DUE_THIS_WEEK", "UPCOMING", "NO_REMINDER"])
+  const interactionTypeEnum = z.enum(["EMAIL", "CALL", "MEETING", "LINKEDIN", "FOLLOWUP", "PROPOSAL", "OTHER"])
 
-  functions.push({
-    name: "create_contact",
-    description: "Create a new contact with associated companies and team members",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Contact name"
-        },
-        email: {
-          type: "string", 
-          format: "email",
-          description: "Contact email"
-        },
-        jobTitle: {
-          type: "string",
-          description: "Job title"
-        },
-        linkedinUrl: {
-          type: "string",
-          format: "uri", 
-          description: "LinkedIn profile URL"
-        },
-        referrer: {
-          type: "string",
-          description: "Who referred this contact"
-        },
-        labels: {
-          type: "string",
-          description: "Comma-separated labels"
-        },
-        cadence: {
-          type: "string",
-          enum: ["1_DAY", "2_DAYS", "3_DAYS", "5_DAYS", "7_DAYS", "2_WEEKS", "3_WEEKS", "1_MONTH", "2_MONTHS", "3_MONTHS", "6_MONTHS", "9_MONTHS", "12_MONTHS", "18_MONTHS", "24_MONTHS"],
-          default: "3_MONTHS",
-          description: "Follow-up frequency"
-        },
-        lastTouchDate: {
-          type: "string",
-          format: "date",
-          description: "Last contact date (YYYY-MM-DD)"
-        },
-        generalNotes: {
-          type: "string",
-          description: "General notes"
-        },
-        customFields: {
-          type: "object",
-          description: "Custom fields as key-value pairs",
-          additionalProperties: {
-            type: "string"
-          }
-        },
-        companyIds: {
-          type: "array",
-          items: {
-            type: "string"
-          },
-          description: "Array of company IDs to associate"
-        },
-        teamMemberIds: {
-          type: "array", 
-          items: {
-            type: "string"
-          },
-          description: "Array of team member IDs to associate"
-        }
-      },
-      required: ["name", "email"]
-    }
-  })
+  return [
+    // ==================== CONTACTS ====================
+    tool({
+      name: "search_contacts",
+      description: "Search and filter contacts with pagination. Use this to find contacts by name, company, reminder status, etc. All parameters have defaults and can be omitted.",
+      parameters: z.object({}),
+      execute: async (args: any) => executeFunction('search_contacts', args)
+    }),
+    tool({
+      name: "create_contact",
+      description: "Create a new contact with associated companies and team members. IMPORTANT: Always include the current user's team member ID in teamMemberIds unless user explicitly assigns to someone else.",
+      parameters: z.object({
+        name: z.string().describe("Contact name"),
+        email: z.string().email().describe("Contact email"),
+        jobTitle: z.string().nullable().optional().describe("Job title"),
+        linkedinUrl: z.string().nullable().optional().describe("LinkedIn profile URL"),
+        referrer: z.string().nullable().optional().describe("Who referred this contact"),
+        labels: z.string().nullable().optional().describe("Comma-separated labels"),
+        cadence: cadenceEnum.default("3_MONTHS").nullable().optional().describe("Follow-up frequency"),
+        lastTouchDate: z.string().nullable().optional().describe("Last contact date (YYYY-MM-DD)"),
+        generalNotes: z.string().nullable().optional().describe("General notes"),
+        customFields: z.record(z.string()).nullable().optional().describe("Custom fields as key-value pairs"),
+        companyIds: z.array(z.string()).nullable().optional().describe("Array of company IDs to associate"),
+        teamMemberIds: z.array(z.string()).describe("Array of team member IDs to associate - REQUIRED, use current user's team member ID from context")
+      }),
+      execute: async (args: any) => executeFunction('create_contact', args)
+    }),
 
-  functions.push({
-    name: "get_contact_by_id",
-    description: "Get a specific contact by ID with all associated data",
-    parameters: {
-      type: "object",
-      properties: {
-        id: {
-          type: "string",
-          description: "Contact ID"
-        }
-      },
-      required: ["id"]
-    }
-  })
+    tool({
+      name: "get_contact_by_id",
+      description: "Get a specific contact by ID with all associated data",
+      parameters: z.object({
+        id: z.string().describe("Contact ID")
+      }),
+      execute: async (args: any) => executeFunction('get_contact_by_id', args)
+    }),
 
-  functions.push({
-    name: "update_contact",
-    description: "Update contact information and associations",
-    parameters: {
-      type: "object",
-      properties: {
-        id: {
-          type: "string",
-          description: "Contact ID"
-        },
-        name: {
-          type: "string",
-          description: "Contact name"
-        },
-        email: {
-          type: "string",
-          format: "email", 
-          description: "Contact email"
-        },
-        jobTitle: {
-          type: "string",
-          description: "Job title"
-        },
-        linkedinUrl: {
-          type: "string",
-          format: "uri",
-          description: "LinkedIn profile URL"
-        },
-        referrer: {
-          type: "string",
-          description: "Who referred this contact"
-        },
-        labels: {
-          type: "string",
-          description: "Comma-separated labels"
-        },
-        cadence: {
-          type: "string",
-          enum: ["1_DAY", "2_DAYS", "3_DAYS", "5_DAYS", "7_DAYS", "2_WEEKS", "3_WEEKS", "1_MONTH", "2_MONTHS", "3_MONTHS", "6_MONTHS", "9_MONTHS", "12_MONTHS", "18_MONTHS", "24_MONTHS"],
-          description: "Follow-up frequency"
-        },
-        lastTouchDate: {
-          type: "string",
-          format: "date",
-          description: "Last contact date (YYYY-MM-DD)"
-        },
-        nextReminderDate: {
-          type: "string",
-          format: "date",
-          description: "Next reminder date (YYYY-MM-DD) - use this for custom reminder timing"
-        },
-        generalNotes: {
-          type: "string",
-          description: "General notes"
-        },
-        customFields: {
-          type: "object",
-          description: "Custom fields as key-value pairs",
-          additionalProperties: {
-            type: "string"
-          }
-        },
-        companyIds: {
-          type: "array",
-          items: {
-            type: "string"
-          },
-          description: "Array of company IDs to associate with this contact"
-        },
-        teamMemberIds: {
-          type: "array",
-          items: {
-            type: "string"
-          },
-          description: "Array of team member IDs to associate with this contact"
-        }
-      },
-      required: ["id"]
-    }
-  })
+    tool({
+      name: "update_contact",
+      description: "Update contact information and associations. IMPORTANT: Only include fields you want to change. Omit companyIds and teamMemberIds to preserve existing relationships.",
+      parameters: z.object({
+        id: z.string().describe("Contact ID"),
+        name: z.string().nullable().optional().describe("Contact name"),
+        email: z.string().email().nullable().optional().describe("Contact email"),
+        jobTitle: z.string().nullable().optional().describe("Job title"),
+        linkedinUrl: z.string().nullable().optional().describe("LinkedIn profile URL"),
+        referrer: z.string().nullable().optional().describe("Who referred this contact"),
+        labels: z.string().nullable().optional().describe("Comma-separated labels"),
+        cadence: cadenceEnum.nullable().optional().describe("Follow-up frequency"),
+        lastTouchDate: z.string().nullable().optional().describe("Last contact date (YYYY-MM-DD)"),
+        nextReminderDate: z.string().nullable().optional().describe("Next reminder date (YYYY-MM-DD) - use this for custom reminder timing"),
+        generalNotes: z.string().nullable().optional().describe("General notes"),
+        customFields: z.record(z.string()).nullable().optional().describe("Custom fields as key-value pairs"),
+        companyIds: z.array(z.string()).nullable().optional().describe("Array of company IDs to associate with this contact"),
+        teamMemberIds: z.array(z.string()).nullable().optional().describe("Array of team member IDs to associate with this contact")
+      }),
+      execute: async (args: any) => executeFunction('update_contact', args)
+    }),
 
-  functions.push({
-    name: "delete_contact",
-    description: "Permanently delete a contact and all associated notes and interactions",
-    parameters: {
-      type: "object",
-      properties: {
-        id: {
-          type: "string",
-          description: "Contact ID"
-        }
-      },
-      required: ["id"]
-    }
-  })
+    tool({
+      name: "delete_contact",
+      description: "Permanently delete a contact and all associated notes and interactions",
+      parameters: z.object({
+        id: z.string().describe("Contact ID")
+      }),
+      execute: async (args: any) => executeFunction('delete_contact', args)
+    }),
 
-  // ==================== NOTES ====================
-  
-  functions.push({
-    name: "add_note_to_contact",
-    description: "Add a note to a contact. This automatically updates the last touch date and recalculates reminders.",
-    parameters: {
-      type: "object",
-      properties: {
-        contactId: {
-          type: "string",
-          description: "Contact ID"
-        },
-        content: {
-          type: "string",
-          description: "Note content with rich text support"
-        },
-        teamMemberId: {
-          type: "string",
-          description: "ID of team member creating the note"
-        }
-      },
-      required: ["contactId", "content", "teamMemberId"]
-    }
-  })
+    // ==================== NOTES ====================
 
-  functions.push({
-    name: "delete_note",
-    description: "Permanently delete a note",
-    parameters: {
-      type: "object",
-      properties: {
-        id: {
-          type: "string",
-          description: "Note ID"
-        }
-      },
-      required: ["id"]
-    }
-  })
+    tool({
+      name: "add_note_to_contact",
+      description: "Add a note to a contact. This automatically updates the last touch date and recalculates reminders.",
+      parameters: z.object({
+        contactId: z.string().describe("Contact ID"),
+        content: z.string().describe("Note content with rich text support"),
+        teamMemberId: z.string().describe("ID of team member creating the note")
+      }),
+      execute: async (args: any) => executeFunction('add_note_to_contact', args)
+    }),
 
-  // ==================== INTERACTIONS ====================
-  
-  functions.push({
-    name: "add_interaction_to_contact", 
-    description: "Log an interaction (call, email, meeting, etc.) with a contact. This automatically updates last touch date and recalculates reminders by default.",
-    parameters: {
-      type: "object",
-      properties: {
-        contactId: {
-          type: "string",
-          description: "Contact ID"
-        },
-        type: {
-          type: "string",
-          enum: ["EMAIL", "CALL", "MEETING", "LINKEDIN", "FOLLOWUP", "PROPOSAL", "OTHER"],
-          description: "Type of interaction"
-        },
-        subject: {
-          type: "string",
-          description: "Interaction subject"
-        },
-        content: {
-          type: "string", 
-          description: "Interaction details"
-        },
-        outcome: {
-          type: "string",
-          description: "Interaction outcome"
-        },
-        interactionDate: {
-          type: "string",
-          format: "date",
-          description: "Interaction date (YYYY-MM-DD), defaults to today"
-        },
-        teamMemberId: {
-          type: "string",
-          description: "ID of team member logging the interaction"
-        },
-        updateLastTouch: {
-          type: "boolean", 
-          default: true,
-          description: "Whether to update contact last touch date and recalculate reminder (defaults to true)"
-        }
-      },
-      required: ["contactId", "type", "content", "teamMemberId"]
-    }
-  })
+    tool({
+      name: "delete_note",
+      description: "Permanently delete a note",
+      parameters: z.object({
+        id: z.string().describe("Note ID")
+      }),
+      execute: async (args: any) => executeFunction('delete_note', args)
+    }),
 
-  functions.push({
-    name: "update_interaction",
-    description: "Update interaction details",
-    parameters: {
-      type: "object",
-      properties: {
-        id: {
-          type: "string",
-          description: "Interaction ID"
-        },
-        type: {
-          type: "string",
-          enum: ["EMAIL", "CALL", "MEETING", "LINKEDIN", "FOLLOWUP", "PROPOSAL", "OTHER"],
-          description: "Type of interaction"
-        },
-        subject: {
-          type: "string",
-          description: "Interaction subject"
-        },
-        content: {
-          type: "string",
-          description: "Interaction details"
-        },
-        outcome: {
-          type: "string",
-          description: "Interaction outcome"
-        },
-        interactionDate: {
-          type: "string",
-          format: "date",
-          description: "Interaction date (YYYY-MM-DD)"
-        }
-      },
-      required: ["id"]
-    }
-  })
+    // ==================== INTERACTIONS ====================
 
-  functions.push({
-    name: "delete_interaction",
-    description: "Permanently delete an interaction",
-    parameters: {
-      type: "object",
-      properties: {
-        id: {
-          type: "string",
-          description: "Interaction ID"
-        }
-      },
-      required: ["id"]
-    }
-  })
+    tool({
+      name: "add_interaction_to_contact",
+      description: "Log an interaction (call, email, meeting, etc.) with a contact. This automatically updates last touch date and recalculates reminders by default.",
+      parameters: z.object({
+        contactId: z.string().describe("Contact ID"),
+        type: interactionTypeEnum.describe("Type of interaction"),
+        subject: z.string().nullable().optional().describe("Interaction subject"),
+        content: z.string().describe("Interaction details"),
+        outcome: z.string().nullable().optional().describe("Interaction outcome"),
+        interactionDate: z.string().nullable().optional().describe("Interaction date (YYYY-MM-DD), defaults to today"),
+        teamMemberId: z.string().describe("ID of team member logging the interaction"),
+        updateLastTouch: z.boolean().default(true).nullable().optional().describe("Whether to update contact last touch date and recalculate reminder (defaults to true)")
+      }),
+      execute: async (args: any) => executeFunction('add_interaction_to_contact', args)
+    }),
 
-  // ==================== TIMELINE & DASHBOARD ====================
-  
-  functions.push({
-    name: "get_contact_timeline",
-    description: "Get chronological timeline of notes and interactions for a contact",
-    parameters: {
-      type: "object",
-      properties: {
-        contactId: {
-          type: "string",
-          description: "Contact ID"
-        }
-      },
-      required: ["contactId"]
-    }
-  })
+    tool({
+      name: "update_interaction",
+      description: "Update interaction details",
+      parameters: z.object({
+        id: z.string().describe("Interaction ID"),
+        type: interactionTypeEnum.nullable().optional().describe("Type of interaction"),
+        subject: z.string().nullable().optional().describe("Interaction subject"),
+        content: z.string().nullable().optional().describe("Interaction details"),
+        outcome: z.string().nullable().optional().describe("Interaction outcome"),
+        interactionDate: z.string().nullable().optional().describe("Interaction date (YYYY-MM-DD)")
+      }),
+      execute: async (args: any) => executeFunction('update_interaction', args)
+    }),
 
-  functions.push({
-    name: "get_dashboard_stats",
-    description: "Get dashboard statistics including contact counts by reminder status",
-    parameters: {
-      type: "object",
-      properties: {}
-    }
-  })
+    tool({
+      name: "delete_interaction",
+      description: "Permanently delete an interaction",
+      parameters: z.object({
+        id: z.string().describe("Interaction ID")
+      }),
+      execute: async (args: any) => executeFunction('delete_interaction', args)
+    }),
 
-  // ==================== COMPANIES ====================
-  
-  functions.push({
-    name: "search_companies",
-    description: "Search companies by name or industry. Use this to find companies before creating or updating.",
-    parameters: {
-      type: "object",
-      properties: {
-        search: {
-          type: "string",
-          description: "Search by company name or industry (case-insensitive partial match)"
-        }
-      }
-    }
-  })
+    // ==================== TIMELINE & DASHBOARD ====================
 
-  functions.push({
-    name: "create_company",
-    description: "Create a new company",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Company name"
-        },
-        website: {
-          type: "string",
-          format: "uri",
-          description: "Company website"
-        },
-        industry: {
-          type: "string",
-          description: "Industry sector"
-        },
-        size: {
-          type: "string",
-          description: "Company size"
-        }
-      },
-      required: ["name"]
-    }
-  })
+    tool({
+      name: "get_contact_timeline",
+      description: "Get chronological timeline of notes and interactions for a contact",
+      parameters: z.object({
+        contactId: z.string().describe("Contact ID")
+      }),
+      execute: async (args: any) => executeFunction('get_contact_timeline', args)
+    }),
 
-  functions.push({
-    name: "get_company_by_id",
-    description: "Get a specific company by ID with contact count",
-    parameters: {
-      type: "object",
-      properties: {
-        id: {
-          type: "string",
-          description: "Company ID"
-        }
-      },
-      required: ["id"]
-    }
-  })
+    tool({
+      name: "get_dashboard_stats",
+      description: "Get dashboard statistics including contact counts by reminder status",
+      parameters: z.object({}),
+      execute: async (args: any) => executeFunction('get_dashboard_stats', args)
+    }),
 
-  functions.push({
-    name: "update_company",
-    description: "Update company information",
-    parameters: {
-      type: "object",
-      properties: {
-        id: {
-          type: "string",
-          description: "Company ID"
-        },
-        name: {
-          type: "string",
-          description: "Company name"
-        },
-        website: {
-          type: "string",
-          format: "uri",
-          description: "Company website"
-        },
-        industry: {
-          type: "string",
-          description: "Industry sector"
-        },
-        size: {
-          type: "string",
-          description: "Company size"
-        }
-      },
-      required: ["id"]
-    }
-  })
+    // ==================== COMPANIES ====================
 
-  functions.push({
-    name: "delete_company",
-    description: "Permanently delete a company",
-    parameters: {
-      type: "object",
-      properties: {
-        id: {
-          type: "string",
-          description: "Company ID"
-        }
-      },
-      required: ["id"]
-    }
-  })
+    tool({
+      name: "search_companies",
+      description: "Search companies by name or industry. Use this to find companies before creating or updating.",
+      parameters: z.object({
+        search: z.string().nullable().optional().describe("Search by company name or industry (case-insensitive partial match)")
+      }),
+      execute: async (args: any) => executeFunction('search_companies', args)
+    }),
 
-  // ==================== TEAM MEMBERS ====================
-  
-  functions.push({
-    name: "search_team_members",
-    description: "Search team members by name or email. Use this to find team members before creating or assigning.",
-    parameters: {
-      type: "object",
-      properties: {
-        search: {
-          type: "string",
-          description: "Search by team member name or email (case-insensitive partial match)"
-        }
-      }
-    }
-  })
+    tool({
+      name: "create_company",
+      description: "Create a new company",
+      parameters: z.object({
+        name: z.string().describe("Company name"),
+        website: z.string().nullable().optional().describe("Company website"),
+        industry: z.string().nullable().optional().describe("Industry sector"),
+        size: z.string().nullable().optional().describe("Company size")
+      }),
+      execute: async (args: any) => executeFunction('create_company', args)
+    }),
 
-  functions.push({
-    name: "create_team_member",
-    description: "Create a new team member",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Team member name"
-        },
-        email: {
-          type: "string",
-          format: "email",
-          description: "Team member email"
-        }
-      },
-      required: ["name", "email"]
-    }
-  })
+    tool({
+      name: "get_company_by_id",
+      description: "Get a specific company by ID with contact count",
+      parameters: z.object({
+        id: z.string().describe("Company ID")
+      }),
+      execute: async (args: any) => executeFunction('get_company_by_id', args)
+    }),
 
-  return functions
+    tool({
+      name: "update_company",
+      description: "Update company information",
+      parameters: z.object({
+        id: z.string().describe("Company ID"),
+        name: z.string().nullable().optional().describe("Company name"),
+        website: z.string().nullable().optional().describe("Company website"),
+        industry: z.string().nullable().optional().describe("Industry sector"),
+        size: z.string().nullable().optional().describe("Company size")
+      }),
+      execute: async (args: any) => executeFunction('update_company', args)
+    }),
+
+    tool({
+      name: "delete_company",
+      description: "Permanently delete a company",
+      parameters: z.object({
+        id: z.string().describe("Company ID")
+      }),
+      execute: async (args: any) => executeFunction('delete_company', args)
+    }),
+
+    // ==================== TEAM MEMBERS ====================
+
+    tool({
+      name: "search_team_members",
+      description: "Search team members by name or email. Use this to find team members before creating or assigning.",
+      parameters: z.object({
+        search: z.string().nullable().optional().describe("Search by team member name or email (case-insensitive partial match)")
+      }),
+      execute: async (args: any) => executeFunction('search_team_members', args)
+    }),
+
+    tool({
+      name: "create_team_member",
+      description: "Create a new team member",
+      parameters: z.object({
+        name: z.string().describe("Team member name"),
+        email: z.string().email().describe("Team member email")
+      }),
+      execute: async (args: any) => executeFunction('create_team_member', args)
+    }),
+  ]
 }

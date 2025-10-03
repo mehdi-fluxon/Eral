@@ -23,9 +23,6 @@ const prisma = new PrismaClient()
  *                 type: string
  *                 description: Natural language message to the AI agent
  *                 example: "Show me all overdue contacts"
- *               threadId:
- *                 type: string
- *                 description: Conversation thread ID (optional, will create new if not provided)
  *             required:
  *               - message
  *     responses:
@@ -41,9 +38,6 @@ const prisma = new PrismaClient()
  *                 response:
  *                   type: string
  *                   description: AI agent's response
- *                 threadId:
- *                   type: string
- *                   description: Conversation thread ID for follow-up messages
  *                 status:
  *                   type: string
  *                   description: Processing status
@@ -76,7 +70,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { message, threadId } = await request.json()
+    const { message } = await request.json()
 
     if (!message) {
       return NextResponse.json(
@@ -85,19 +79,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create new thread if none provided
-    let currentThreadId = threadId
-    if (!currentThreadId) {
-      const thread = await luxonAIAssistant.createThread()
-      currentThreadId = thread.id
-    }
-
-    // Process the message with user context
+    // Process the message with user context and conversation state
     const startTime = Date.now()
     const result = await luxonAIAssistant.processMessage(
-      currentThreadId,
       message,
-      teamMember.id // Pass the team member ID as context
+      session.user.id!, // User ID for conversation state
+      teamMember.id
     )
     const duration = Date.now() - startTime
 
@@ -107,7 +94,6 @@ export async function POST(request: NextRequest) {
       userId: session.user.id,
       userEmail: session.user.email,
       teamMemberId: teamMember.id,
-      threadId: currentThreadId,
       question: message,
       response: result.response,
       status: result.success ? result.status : 'error',
@@ -115,10 +101,7 @@ export async function POST(request: NextRequest) {
       type: 'ai_conversation'
     }))
 
-    return NextResponse.json({
-      ...result,
-      threadId: result.threadId || currentThreadId
-    })
+    return NextResponse.json(result)
   } catch (error) {
     console.error('AI Agent API error:', error)
     return NextResponse.json(
@@ -133,34 +116,33 @@ export async function POST(request: NextRequest) {
  * /api/ai-agent:
  *   get:
  *     tags: [AI Agent]
- *     summary: Create new conversation thread
- *     description: Create a new conversation thread for the AI agent
+ *     summary: Get agent status
+ *     description: Check if the AI agent is available and ready
  *     responses:
  *       200:
- *         description: New thread created
+ *         description: Agent is ready
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 threadId:
+ *                 status:
  *                   type: string
- *                   description: New conversation thread ID
+ *                   description: Agent status
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
 
 export async function GET() {
   try {
-    const thread = await luxonAIAssistant.createThread()
-    
     return NextResponse.json({
-      threadId: thread.id
+      status: 'ready',
+      message: 'AI Agent is ready to process requests'
     })
   } catch (error) {
-    console.error('Failed to create thread:', error)
+    console.error('Failed to get agent status:', error)
     return NextResponse.json(
-      { error: 'Failed to create conversation thread' },
+      { error: 'Failed to get agent status' },
       { status: 500 }
     )
   }

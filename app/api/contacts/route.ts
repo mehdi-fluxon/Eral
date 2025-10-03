@@ -238,14 +238,14 @@ export async function POST(request: NextRequest) {
       referrer: referrer || null,
       labels: labels || null,
       crmId: crmId || null,
-      cadence,
+      cadence: cadence || '3_MONTHS', // Ensure cadence is never null
       lastTouchDate: touchDate,
       nextReminderDate: nextReminder,
       generalNotes: generalNotes || null,
       customFields: customFields,
     }
 
-    if (companyIds.length > 0) {
+    if (companyIds && companyIds.length > 0) {
       contactData.companies = {
         create: companyIds.map((companyId: string) => ({
           companyId
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (teamMemberIds.length > 0) {
+    if (teamMemberIds && teamMemberIds.length > 0) {
       const validTeamMembers = await prisma.teamMember.findMany({
         where: { id: { in: teamMemberIds } }
       })

@@ -82,16 +82,8 @@ export class SlackClient {
         return
       }
 
-      // Get or create thread for this user
-      let threadId = this.threadMap.get(event.user)
-      if (!threadId) {
-        const thread = await luxonAIAssistant.createThread()
-        threadId = thread.id
-        this.threadMap.set(event.user, threadId)
-      }
-
-      // Process message with AI agent
-      const result = await luxonAIAssistant.processMessage(threadId, messageText)
+      // Process message with AI agent (no thread management needed with Agents SDK)
+      const result = await luxonAIAssistant.processMessage(messageText, "slack-user")
 
       // Format response for Slack
       const formattedResponse = this.formatResponseForSlack(result.response)
@@ -139,16 +131,8 @@ export class SlackClient {
 
   private async processSlashCommandAsync(userId: string, text: string, channelId: string, responseUrl: string) {
     try {
-      // Get or create thread for this user
-      let threadId = this.threadMap.get(userId)
-      if (!threadId) {
-        const thread = await luxonAIAssistant.createThread()
-        threadId = thread.id
-        this.threadMap.set(userId, threadId)
-      }
-
-      // Process message with AI agent
-      const result = await luxonAIAssistant.processMessage(threadId, text)
+      // Process message with AI agent (no thread management needed with Agents SDK)
+      const result = await luxonAIAssistant.processMessage(text, "slack-user")
 
       // Format response for Slack
       const formattedResponse = this.formatResponseForSlack(result.response)

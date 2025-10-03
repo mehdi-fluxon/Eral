@@ -201,8 +201,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       await prisma.contactCompany.deleteMany({
         where: { contactId: id }
       })
-      updateData.companies = {
-        create: companyIds.map((companyId: string) => ({ companyId }))
+      if (companyIds && companyIds.length > 0) {
+        updateData.companies = {
+          create: companyIds.map((companyId: string) => ({ companyId }))
+        }
       }
     }
 
@@ -210,12 +212,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       await prisma.contactTeamMember.deleteMany({
         where: { contactId: id }
       })
-      
-      if (teamMemberIds.length > 0) {
+
+      if (teamMemberIds && teamMemberIds.length > 0) {
         const validTeamMembers = await prisma.teamMember.findMany({
           where: { id: { in: teamMemberIds } }
         })
-        
+
         if (validTeamMembers.length > 0) {
           updateData.teamMembers = {
             create: validTeamMembers.map(member => ({ teamMemberId: member.id }))

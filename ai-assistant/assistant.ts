@@ -1,32 +1,35 @@
+import { Agent, run, AgentInputItem } from '@openai/agents'
+import { generateAgentTools } from './functions'
 import OpenAI from 'openai'
-import { generateOpenAIFunctions, executeFunction } from './functions'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
-
-const ASSISTANT_ID = process.env.OPENAI_ASSISTANT_ID
+// Store conversation history by user ID
+const userConversationHistories = new Map<string, AgentInputItem[]>()
 
 export class LuxonAIAssistant {
-  private assistantId: string | null = null
+  private agent: Agent | null = null
+  private openai: OpenAI | null = null
 
   constructor() {
-    this.assistantId = ASSISTANT_ID || null
+    // Agent will be created on first use
   }
 
-  async createOrGetAssistant() {
-    if (this.assistantId) {
-      try {
-        const assistant = await openai.beta.assistants.retrieve(this.assistantId)
-        return assistant
-      } catch (error) {
-        console.log('Assistant not found, creating new one...')
-      }
+  private getOpenAIClient() {
+    if (!this.openai) {
+      this.openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      })
+    }
+    return this.openai
+  }
+
+  async createOrGetAgent() {
+    if (this.agent) {
+      return this.agent
     }
 
-    const functions = generateOpenAIFunctions()
-    
-    const assistant = await openai.beta.assistants.create({
+    const tools = generateAgentTools()
+
+    this.agent = new Agent({
       name: "LuxonAI Contact Manager",
       instructions: `You are LuxonAI's intelligent contact management assistant. You help users manage their professional relationships through natural language.
 
@@ -58,135 +61,41 @@ Important behaviors:
 5. When searching contacts, use appropriate filters (reminderStatus for "overdue", "due today", etc.)
 6. Always provide context-rich responses that help users understand their relationship pipeline
 7. ALWAYS try to resolve names/companies yourself before asking the user for more information
+8. When updating a contact, ONLY include fields you want to change - do NOT pass null/empty values for companyIds or teamMemberIds unless explicitly removing them
+9. When presenting follow-up results, ALWAYS maintain chronological order by date (earliest date first) within each category (Overdue, Due Today, Upcoming, etc.)
+10. When user asks for follow-ups within a timeframe (this week, this month, this quarter, next 30 days, etc.), ALWAYS EXCLUDE overdue items unless explicitly asked for - only show items from today forward. Use appropriate filters or post-process results to match the requested timeframe
 
 CRITICAL: Team Member ID Management
-8. BEFORE creating any interaction or note, ALWAYS use search_team_members to get valid team member IDs
-9. Use the first available team member ID from the search results
-10. NEVER use hardcoded or cached team member IDs - always fetch fresh data
-11. If no team members exist, inform the user they need to create a team member first
+9. When creating a NEW contact, ALWAYS assign it to the current user's team member ID (from context) unless user explicitly specifies a different team member
+10. BEFORE creating any interaction or note, ALWAYS use search_team_members to get valid team member IDs
+11. Use the first available team member ID from the search results
+12. NEVER use hardcoded or cached team member IDs - always fetch fresh data
+13. If no team members exist, inform the user they need to create a team member first
 
-Format responses in a business-friendly way with clear action items and next steps.`,
+Response Formatting Guidelines:
+- Keep responses concise and scannable
+- Use clean markdown formatting with proper spacing
+- For contact lists: show only essential info (name, email, reminder date, company if relevant)
+- Avoid excessive notes/details unless specifically requested
+- Use bullet points instead of long paragraphs
+- Limit "Next Steps" suggestions to 1-2 most important items
+- Don't repeat information that's already shown
+- Group similar items together logically`,
       model: "gpt-4o-mini",
-      tools: functions.map(func => ({ type: "function", function: func }))
+      tools: tools
     })
 
-    this.assistantId = assistant.id
-    console.log(`Created new assistant: ${assistant.id}`)
-    
-    return assistant
+    console.log(`Created new agent: ${this.agent.name}`)
+
+    return this.agent
   }
 
-  async createThread() {
-    const thread = await openai.beta.threads.create()
-    return thread
-  }
-
-  async addMessage(threadId: string, content: string) {
-    const message = await openai.beta.threads.messages.create(threadId, {
-      role: "user",
-      content: content
-    })
-    return message
-  }
-
-  async runAssistant(threadId: string) {
-    const assistant = await this.createOrGetAssistant()
-    
-    const run = await openai.beta.threads.runs.create(threadId, {
-      assistant_id: assistant.id
-    })
-    return this.waitForCompletion(threadId, run.id)
-  }
-
-  private async waitForCompletion(threadId: string, runId: string): Promise<any> {
-    if (!threadId || !runId) {
-      throw new Error(`Invalid parameters: threadId=${threadId}, runId=${runId}`)
-    }
-    
-    // OpenAI SDK v5: beta.threads.runs.retrieve(runId, { thread_id: threadId })
-    let run = await openai.beta.threads.runs.retrieve(runId, { thread_id: threadId })
-    
-    while (run.status === 'queued' || run.status === 'in_progress') {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      run = await openai.beta.threads.runs.retrieve(runId, { thread_id: threadId })
-    }
-
-    if (run.status === 'requires_action') {
-      return this.handleRequiredActions(threadId, runId, run)
-    }
-
-    if (run.status === 'completed') {
-      const messages = await openai.beta.threads.messages.list(threadId)
-      return {
-        status: 'completed',
-        messages: messages.data.filter(msg => msg.role === 'assistant').map(msg => ({
-          content: msg.content[0].type === 'text' ? msg.content[0].text.value : '',
-          created_at: msg.created_at
-        }))
-      }
-    }
-
-    return {
-      status: run.status,
-      error: `Run failed with status: ${run.status}`
-    }
-  }
-
-  private async handleRequiredActions(threadId: string, runId: string, run: any) {
-    const toolCalls = run.required_action.submit_tool_outputs.tool_calls
-    const toolOutputs = []
-
-    for (const toolCall of toolCalls) {
-      const functionName = toolCall.function.name
-      const functionArgs = JSON.parse(toolCall.function.arguments)
-      
-      console.log(`Executing function: ${functionName}`, functionArgs)
-
-      try {
-        const result = await executeFunction(functionName, functionArgs)
-        console.log(`Function ${functionName} returned:`, JSON.stringify(result).substring(0, 500))
-        toolOutputs.push({
-          tool_call_id: toolCall.id,
-          output: JSON.stringify(result)
-        })
-      } catch (error) {
-        console.error(`Error executing ${functionName}:`, error)
-        toolOutputs.push({
-          tool_call_id: toolCall.id,
-          output: JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })
-        })
-      }
-    }
-
-    await openai.beta.threads.runs.submitToolOutputs(runId, {
-      thread_id: threadId,
-      tool_outputs: toolOutputs
-    })
-
-    return this.waitForCompletion(threadId, runId)
-  }
-
-  async processMessage(threadId: string, userMessage: string, teamMemberId?: string) {
+  async processMessage(userMessage: string, userId: string, teamMemberId?: string) {
     try {
-      // Check if there's an active run on this thread
-      try {
-        const runs = await openai.beta.threads.runs.list(threadId, { limit: 1 })
-        const activeRun = runs.data.find(run =>
-          run.status === 'queued' ||
-          run.status === 'in_progress' ||
-          run.status === 'requires_action'
-        )
+      const agent = await this.createOrGetAgent()
 
-        if (activeRun) {
-          // Create a new thread if there's an active run
-          const newThread = await this.createThread()
-          threadId = newThread.id
-        }
-      } catch (error) {
-        console.log('Could not check thread status, creating new thread. Error:', error instanceof Error ? error.message : error)
-        const newThread = await this.createThread()
-        threadId = newThread.id
-      }
+      // Get previous conversation history
+      const previousHistory = userConversationHistories.get(userId) || []
 
       // Add user context to the message if teamMemberId is provided
       let contextualMessage = userMessage
@@ -194,14 +103,20 @@ Format responses in a business-friendly way with clear action items and next ste
         contextualMessage = `[User Context: The current user's team member ID is "${teamMemberId}". Use this ID when creating new contacts, interactions, or notes. When searching contacts, search ALL contacts across all team members unless the user specifically asks to filter by a team member.]\n\n${userMessage}`
       }
 
-      await this.addMessage(threadId, contextualMessage)
-      const result = await this.runAssistant(threadId)
-      
+      // Build input: previous history + new message
+      const input = previousHistory.length > 0
+        ? [...previousHistory, { role: 'user' as const, content: contextualMessage }]
+        : contextualMessage
+
+      const result = await run(agent, input)
+
+      // Store the updated history for next time
+      userConversationHistories.set(userId, result.history)
+
       return {
         success: true,
-        response: result.messages?.[0]?.content || 'I apologize, but I encountered an issue processing your request.',
-        status: result.status,
-        threadId: threadId
+        response: result.finalOutput || 'I apologize, but I encountered an issue processing your request.',
+        status: 'completed'
       }
     } catch (error) {
       console.error('Error processing message:', error)

@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",
+    "@openai/agents": "^0.1.9",
     "@prisma/client": "^6.16.2",
     "@slack/bolt": "^4.4.0",
     "@slack/web-api": "^7.10.0",
@@ -27,7 +28,8 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-react": "^5.29.0"
+    "swagger-ui-react": "^5.29.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
