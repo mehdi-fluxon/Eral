@@ -1,5 +1,6 @@
 import { WebClient } from '@slack/web-api'
 import { luxonAIAssistant } from '../ai-assistant/assistant'
+import { executeFunction } from '../ai-assistant/functions'
 
 export class SlackClient {
   private client: WebClient
@@ -7,6 +8,45 @@ export class SlackClient {
 
   constructor() {
     this.client = new WebClient(process.env.SLACK_BOT_TOKEN)
+  }
+
+  private async getSlackUserEmail(userId: string): Promise<string | null> {
+    try {
+      const result = await this.client.users.info({ user: userId })
+      return result.user?.profile?.email || null
+    } catch (error) {
+      console.error('Error fetching Slack user email:', error)
+      return null
+    }
+  }
+
+  private async getTeamMemberIdByEmail(email: string): Promise<string | null> {
+    try {
+      const result = await executeFunction('search_team_members', { search: email })
+      if (result.teamMembers && result.teamMembers.length > 0) {
+        return result.teamMembers[0].id
+      }
+      return null
+    } catch (error) {
+      console.error('Error looking up team member by email:', error)
+      return null
+    }
+  }
+
+  private async getTeamMemberIdForSlackUser(slackUserId: string): Promise<string | undefined> {
+    const email = await this.getSlackUserEmail(slackUserId)
+    if (!email) {
+      console.log('Could not retrieve email for Slack user:', slackUserId)
+      return undefined
+    }
+
+    const teamMemberId = await this.getTeamMemberIdByEmail(email)
+    if (!teamMemberId) {
+      console.log('No team member found for email:', email)
+      return undefined
+    }
+
+    return teamMemberId
   }
 
   private extractTextFromBlocks(blocks: Array<{
@@ -82,8 +122,11 @@ export class SlackClient {
         return
       }
 
+      // Get team member ID for the Slack user
+      const teamMemberId = await this.getTeamMemberIdForSlackUser(event.user)
+
       // Process message with AI agent (no thread management needed with Agents SDK)
-      const result = await luxonAIAssistant.processMessage(messageText, "slack-user")
+      const result = await luxonAIAssistant.processMessage(messageText, event.user, teamMemberId)
 
       // Format response for Slack
       const formattedResponse = this.formatResponseForSlack(result.response)
@@ -131,8 +174,11 @@ export class SlackClient {
 
   private async processSlashCommandAsync(userId: string, text: string, channelId: string, responseUrl: string) {
     try {
+      // Get team member ID for the Slack user
+      const teamMemberId = await this.getTeamMemberIdForSlackUser(userId)
+
       // Process message with AI agent (no thread management needed with Agents SDK)
-      const result = await luxonAIAssistant.processMessage(text, "slack-user")
+      const result = await luxonAIAssistant.processMessage(text, userId, teamMemberId)
 
       // Format response for Slack
       const formattedResponse = this.formatResponseForSlack(result.response)
