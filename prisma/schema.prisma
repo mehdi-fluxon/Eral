@@ -43,6 +43,7 @@ model Contact {
   @@index([email])
   @@index([name])
   @@index([lastName])
+  @@index([jobTitle])
   @@map("contacts")
 }
 

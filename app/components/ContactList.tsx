@@ -16,6 +16,12 @@ interface TeamMember {
   email: string
 }
 
+interface Label {
+  id: string
+  name: string
+  color: string
+}
+
 interface Contact {
   id: string
   name: string
@@ -55,14 +61,17 @@ export default function ContactList({ reminderFilter }: ContactListProps) {
   const [cadenceFilter, setCadenceFilter] = useState('')
   const [companyFilter, setCompanyFilter] = useState('')
   const [reminderStatusFilter, setReminderStatusFilter] = useState('')
+  const [labelFilter, setLabelFilter] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [companies, setCompanies] = useState<Company[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [labels, setLabels] = useState<Label[]>([])
 
   useEffect(() => {
     fetchContacts()
     fetchCompanies()
     fetchTeamMembers()
+    fetchLabels()
   }, [])
 
   // Debounce search term
@@ -76,7 +85,7 @@ export default function ContactList({ reminderFilter }: ContactListProps) {
   useEffect(() => {
     setCurrentPage(1)
     fetchContacts(1)
-  }, [debouncedSearchTerm, teamMemberFilter, cadenceFilter, companyFilter, reminderStatusFilter, reminderFilter])
+  }, [debouncedSearchTerm, teamMemberFilter, cadenceFilter, companyFilter, reminderStatusFilter, labelFilter, reminderFilter])
 
   useEffect(() => {
     fetchContacts(currentPage)
@@ -90,6 +99,7 @@ export default function ContactList({ reminderFilter }: ContactListProps) {
       if (teamMemberFilter) params.append('teamMember', teamMemberFilter)
       if (cadenceFilter) params.append('cadence', cadenceFilter)
       if (companyFilter) params.append('company', companyFilter)
+      if (labelFilter) params.append('label', labelFilter)
       if (reminderStatusFilter) params.append('reminderStatus', reminderStatusFilter)
       if (reminderFilter) params.append('reminderStatus', reminderFilter)
       params.append('page', page.toString())
@@ -128,6 +138,18 @@ export default function ContactList({ reminderFilter }: ContactListProps) {
       }
     } catch (error) {
       console.error('Failed to fetch team members:', error)
+    }
+  }
+
+  const fetchLabels = async () => {
+    try {
+      const response = await fetch('/api/labels')
+      if (response.ok) {
+        const data = await response.json()
+        setLabels(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch labels:', error)
     }
   }
 
@@ -198,7 +220,7 @@ export default function ContactList({ reminderFilter }: ContactListProps) {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
           />
 
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-5 gap-3">
             <select
               value={teamMemberFilter}
               onChange={(e) => setTeamMemberFilter(e.target.value)}
@@ -229,6 +251,17 @@ export default function ContactList({ reminderFilter }: ContactListProps) {
               <option value="">All Companies</option>
               {companies.map(company => (
                 <option key={company.id} value={company.id}>{company.name}</option>
+              ))}
+            </select>
+
+            <select
+              value={labelFilter}
+              onChange={(e) => setLabelFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 text-sm"
+            >
+              <option value="">All Labels</option>
+              {labels.map(label => (
+                <option key={label.id} value={label.id}>{label.name}</option>
               ))}
             </select>
 
@@ -411,7 +444,7 @@ export default function ContactList({ reminderFilter }: ContactListProps) {
       
       {contacts.length === 0 && !loading && (
         <div className="text-center py-8 text-gray-500">
-          {searchTerm || teamMemberFilter || cadenceFilter || companyFilter || reminderStatusFilter
+          {searchTerm || teamMemberFilter || cadenceFilter || companyFilter || labelFilter || reminderStatusFilter
             ? 'No contacts match your filters.'
             : 'No contacts found. Add your first contact to get started.'}
         </div>
