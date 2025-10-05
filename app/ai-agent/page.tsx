@@ -67,15 +67,17 @@ export default function AIAgentPage() {
   useEffect(() => {
     const savedThreadId = localStorage.getItem('luxon-ai-threadId')
     const savedMessages = localStorage.getItem('luxon-ai-messages')
-    
-    if (savedThreadId && savedMessages) {
-      setThreadId(savedThreadId)
+
+    if (savedMessages) {
       try {
         const parsedMessages = JSON.parse(savedMessages)
         setMessages(parsedMessages.map((msg: Message & { timestamp: string }) => ({
           ...msg,
           timestamp: new Date(msg.timestamp)
         })))
+        if (savedThreadId) {
+          setThreadId(savedThreadId)
+        }
       } catch (error) {
         console.error('Error loading saved messages:', error)
         initializeWelcomeMessage()
