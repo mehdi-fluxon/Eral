@@ -59,6 +59,12 @@ Important behaviors:
    - NEVER add date filters (startDate/endDate/reminderStatus) when searching by name
    - Example: "talked to micha yesterday" → search_contacts(search="micha") then add interaction with yesterday's date
 
+1b. When searching for contacts by label:
+   - First use get_labels() to fetch all available labels
+   - Find the label ID from the results
+   - Use search_contacts(label="labelId") to filter by that label
+   - Example: "show me all VIP contacts" → get_labels() → find VIP label ID → search_contacts(label="labelId")
+
 2. When adding notes or interactions WITH temporal references (yesterday, last week, 2 days ago, last quarter, etc.):
    - Calculate the date yourself based on the current date provided in the context
    - For notes: Pass the calculated date in noteDate parameter → add_note_to_contact(noteDate="2025-10-01")

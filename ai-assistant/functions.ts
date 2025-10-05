@@ -49,6 +49,7 @@ export async function executeFunction(functionName: string, parameters: any) {
         if (parameters.teamMember && parameters.teamMember.trim() && parameters.teamMember !== '.') searchParams.append('teamMember', parameters.teamMember)
         if (parameters.cadence && parameters.cadence.trim() && parameters.cadence !== '.') searchParams.append('cadence', parameters.cadence)
         if (parameters.company && parameters.company.trim() && parameters.company !== '.') searchParams.append('company', parameters.company)
+        if (parameters.label && parameters.label.trim() && parameters.label !== '.') searchParams.append('label', parameters.label)
         if (parameters.page) searchParams.append('page', parameters.page.toString())
         if (parameters.limit) searchParams.append('limit', parameters.limit.toString())
 
@@ -235,6 +236,13 @@ export async function executeFunction(functionName: string, parameters: any) {
         return await response.json()
       }
 
+      // ==================== LABELS ====================
+
+      case 'get_labels': {
+        const response = await fetch(`${baseUrl}/api/labels`, { headers })
+        return await response.json()
+      }
+
       default:
         throw new Error(`Unknown function: ${functionName}`)
     }
@@ -263,6 +271,7 @@ export function generateAgentTools() {
         teamMember: z.string().nullable().optional().describe("Filter by team member ID (valid UUID only, do not pass placeholder values like '.')"),
         cadence: z.string().nullable().optional().describe("Filter by cadence value (valid cadence enum only)"),
         company: z.string().nullable().optional().describe("Filter by company ID (valid UUID only, do not pass placeholder values like '.')"),
+        label: z.string().nullable().optional().describe("Filter by label ID (valid UUID only). To find label ID, search labels first using free-text in 'search' parameter."),
         page: z.number().nullable().optional().describe("Page number for pagination"),
         limit: z.number().nullable().optional().describe("Results per page (max 100, default 50)")
       }),
@@ -576,7 +585,13 @@ export function generateAgentTools() {
       }
     }),
 
-
+    // ==================== LABELS ====================
+    tool({
+      name: "get_labels",
+      description: "Get all available labels in the system. Use this to find label IDs for filtering contacts by label.",
+      parameters: z.object({}),
+      execute: async (args: any) => executeFunction('get_labels', args)
+    }),
 
   ]
 }

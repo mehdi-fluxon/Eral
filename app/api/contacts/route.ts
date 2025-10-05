@@ -34,6 +34,11 @@ import { Prisma } from '@prisma/client'
  *           type: string
  *         description: Filter by company ID
  *       - in: query
+ *         name: label
+ *         schema:
+ *           type: string
+ *         description: Filter by label ID
+ *       - in: query
  *         name: reminderStatus
  *         schema:
  *           type: string
@@ -94,6 +99,7 @@ export async function GET(request: NextRequest) {
     const teamMemberFilter = searchParams.get('teamMember') || ''
     const cadenceFilter = searchParams.get('cadence') || ''
     const companyFilter = searchParams.get('company') || ''
+    const labelFilter = searchParams.get('label') || ''
     const reminderStatusFilter = searchParams.get('reminderStatus') || ''
     const startDate = searchParams.get('startDate') || ''
     const endDate = searchParams.get('endDate') || ''
@@ -123,6 +129,10 @@ export async function GET(request: NextRequest) {
 
     if (companyFilter) {
       where.companies = { some: { companyId: companyFilter } }
+    }
+
+    if (labelFilter) {
+      where.labels = { some: { labelId: labelFilter } }
     }
 
     // Custom date range filter (takes precedence over reminderStatusFilter)
