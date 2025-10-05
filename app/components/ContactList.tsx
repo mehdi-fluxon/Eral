@@ -97,10 +97,11 @@ export default function ContactList({ reminderFilter }: ContactListProps) {
 
       const response = await fetch(`/api/contacts?${params.toString()}`)
       const data = await response.json()
-      setContacts(data.contacts)
+      setContacts(data.contacts || [])
       setPagination(data.pagination)
     } catch (error) {
       console.error('Failed to fetch contacts:', error)
+      setContacts([])
     } finally {
       setLoading(false)
     }
@@ -276,7 +277,17 @@ export default function ContactList({ reminderFilter }: ContactListProps) {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {contacts.map((contact) => (
+            {contacts.length === 0 && !loading ? (
+              <tr>
+                <td colSpan={6} className="px-6 py-12 text-center">
+                  <div className="text-gray-500">
+                    <p className="text-lg font-medium">No contacts found</p>
+                    <p className="text-sm mt-1">Get started by creating your first contact</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              contacts.map((contact) => (
               <tr 
                 key={contact.id} 
                 onClick={() => router.push(`/contacts/${contact.id}`)}
@@ -336,7 +347,8 @@ export default function ContactList({ reminderFilter }: ContactListProps) {
                   </span>
                 </td>
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
         </table>
       </div>

@@ -101,6 +101,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         teamMembers: {
           include: { teamMember: true }
         },
+        labels: {
+          include: { label: true }
+        },
         interactions: {
           include: { teamMember: true },
           orderBy: { interactionDate: 'desc' }
@@ -136,7 +139,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       jobTitle,
       linkedinUrl,
       referrer,
-      labels,
       crmId,
       cadence,
       lastTouchDate,
@@ -144,7 +146,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       generalNotes,
       customFields,
       companyIds,
-      teamMemberIds
+      teamMemberIds,
+      labelIds
     } = body
 
     const existingContact = await prisma.contact.findUnique({
@@ -180,7 +183,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (jobTitle !== undefined) updateData.jobTitle = jobTitle || null
     if (linkedinUrl !== undefined) updateData.linkedinUrl = linkedinUrl || null
     if (referrer !== undefined) updateData.referrer = referrer || null
-    if (labels !== undefined) updateData.labels = labels || null
     if (crmId !== undefined) updateData.crmId = crmId || null
     if (generalNotes !== undefined) updateData.generalNotes = generalNotes
     if (customFields !== undefined) updateData.customFields = customFields
@@ -226,6 +228,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    if (labelIds !== undefined) {
+      await prisma.contactLabel.deleteMany({
+        where: { contactId: id }
+      })
+
+      if (labelIds && labelIds.length > 0) {
+        const validLabels = await prisma.label.findMany({
+          where: { id: { in: labelIds } }
+        })
+
+        if (validLabels.length > 0) {
+          updateData.labels = {
+            create: validLabels.map(label => ({ labelId: label.id }))
+          }
+        }
+      }
+    }
+
     const contact = await prisma.contact.update({
       where: { id },
       data: updateData,
@@ -235,6 +255,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         },
         teamMembers: {
           include: { teamMember: true }
+        },
+        labels: {
+          include: { label: true }
         }
       }
     })

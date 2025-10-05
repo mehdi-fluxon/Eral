@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { CADENCE_OPTIONS, getReminderBadgeColor, getReminderBadgeText, type ReminderStatus } from '@/lib/cadence'
 import Toast from '@/app/components/Toast'
@@ -18,6 +18,12 @@ interface TeamMember {
   email: string
 }
 
+interface Label {
+  id: string
+  name: string
+  color: string | null
+}
+
 interface Note {
   id: string
   content: string
@@ -32,7 +38,6 @@ interface Contact {
   jobTitle?: string
   linkedinUrl?: string
   referrer?: string
-  labels?: string
   cadence: string
   lastTouchDate: string
   nextReminderDate: string | null
@@ -41,6 +46,7 @@ interface Contact {
   customFields?: Record<string, string>
   companies: Array<{ company: Company }>
   teamMembers: Array<{ teamMember: TeamMember }>
+  labels: Array<{ label: Label }>
   notes: Note[]
 }
 
@@ -59,69 +65,92 @@ export default function ContactDetailsPage({ params }: { params: Promise<{ id: s
   const [newFieldName, setNewFieldName] = useState('')
   const [showRenameField, setShowRenameField] = useState<string | null>(null)
   const [renameFieldValue, setRenameFieldValue] = useState('')
-  const [newLabel, setNewLabel] = useState('')
-  
-  const getLabelColor = (label: string) => {
-    const colors = [
-      'bg-red-100 text-red-800',
-      'bg-yellow-100 text-yellow-800', 
-      'bg-green-100 text-green-800',
-      'bg-blue-100 text-blue-800',
-      'bg-indigo-100 text-indigo-800',
-      'bg-purple-100 text-purple-800',
-      'bg-pink-100 text-pink-800',
-      'bg-orange-100 text-orange-800',
-      'bg-teal-100 text-teal-800',
-      'bg-cyan-100 text-cyan-800'
-    ]
-    let hash = 0
-    for (let i = 0; i < label.length; i++) {
-      hash = label.charCodeAt(i) + ((hash << 5) - hash)
+
+  const [allLabels, setAllLabels] = useState<Label[]>([])
+  const [labelSearchTerm, setLabelSearchTerm] = useState('')
+  const [showLabelDropdown, setShowLabelDropdown] = useState(false)
+  const [creatingNewLabel, setCreatingNewLabel] = useState(false)
+  const labelDropdownRef = useRef<HTMLDivElement>(null)
+
+  const addExistingLabel = (labelId: string) => {
+    if (!formData.labelIds.includes(labelId)) {
+      setFormData({ ...formData, labelIds: [...formData.labelIds, labelId] })
     }
-    return colors[Math.abs(hash) % colors.length]
+    setLabelSearchTerm('')
+    setShowLabelDropdown(false)
   }
 
-  const getLabelsArray = () => {
-    return formData.labels ? formData.labels.split(',').map(l => l.trim()).filter(l => l) : []
-  }
+  const createAndAddLabel = async () => {
+    if (!labelSearchTerm.trim()) return
 
-  const addLabel = () => {
-    if (newLabel.trim()) {
-      const currentLabels = getLabelsArray()
-      if (!currentLabels.includes(newLabel.trim())) {
-        const updatedLabels = [...currentLabels, newLabel.trim()]
-        setFormData({ ...formData, labels: updatedLabels.join(', ') })
+    setCreatingNewLabel(true)
+    try {
+      const response = await fetch('/api/labels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: labelSearchTerm.trim() })
+      })
+
+      if (response.ok) {
+        const newLabel = await response.json()
+        setAllLabels([...allLabels, newLabel])
+        setFormData({ ...formData, labelIds: [...formData.labelIds, newLabel.id] })
+        setLabelSearchTerm('')
+        setShowLabelDropdown(false)
+        showToast('Label created successfully', 'success')
+      } else {
+        showToast('Failed to create label', 'error')
       }
-      setNewLabel('')
+    } catch (error) {
+      console.error('Failed to create label:', error)
+      showToast('Failed to create label', 'error')
+    } finally {
+      setCreatingNewLabel(false)
     }
   }
 
-  const removeLabel = (labelToRemove: string) => {
-    const currentLabels = getLabelsArray()
-    const updatedLabels = currentLabels.filter(label => label !== labelToRemove)
-    setFormData({ ...formData, labels: updatedLabels.join(', ') })
+  const removeLabel = (labelIdToRemove: string) => {
+    setFormData({
+      ...formData,
+      labelIds: formData.labelIds.filter(id => id !== labelIdToRemove)
+    })
   }
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     jobTitle: '',
     linkedinUrl: '',
     referrer: '',
-    labels: '',
     cadence: '3_MONTHS',
     lastTouchDate: '',
     generalNotes: '',
     customFields: {} as Record<string, string>,
     companyIds: [] as string[],
-    teamMemberIds: [] as string[]
+    teamMemberIds: [] as string[],
+    labelIds: [] as string[]
   })
 
   useEffect(() => {
     fetchContact()
     fetchCompanies()
     fetchTeamMembers()
+    fetchLabels()
   }, [id])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (labelDropdownRef.current && !labelDropdownRef.current.contains(event.target as Node)) {
+        setShowLabelDropdown(false)
+      }
+    }
+
+    if (showLabelDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showLabelDropdown])
 
   const fetchContact = async () => {
     try {
@@ -135,13 +164,13 @@ export default function ContactDetailsPage({ params }: { params: Promise<{ id: s
           jobTitle: data.jobTitle || '',
           linkedinUrl: data.linkedinUrl || '',
           referrer: data.referrer || '',
-          labels: data.labels || '',
           cadence: data.cadence,
           lastTouchDate: new Date(data.lastTouchDate).toISOString().split('T')[0],
           generalNotes: data.generalNotes || '',
           customFields: data.customFields || {},
           companyIds: data.companies.map((c: { company: Company }) => c.company.id),
-          teamMemberIds: data.teamMembers.map((m: { teamMember: TeamMember }) => m.teamMember.id)
+          teamMemberIds: data.teamMembers.map((m: { teamMember: TeamMember }) => m.teamMember.id),
+          labelIds: data.labels?.map((l: { label: Label }) => l.label.id) || []
         })
       } else {
         showToast('Contact not found', 'error')
@@ -178,6 +207,28 @@ export default function ContactDetailsPage({ params }: { params: Promise<{ id: s
       console.error('Failed to fetch team members:', error)
     }
   }
+
+  const fetchLabels = async () => {
+    try {
+      const response = await fetch('/api/labels')
+      if (response.ok) {
+        const data = await response.json()
+        setAllLabels(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch labels:', error)
+    }
+  }
+
+  // Computed values for label filtering
+  const filteredLabels = allLabels.filter(label =>
+    !formData.labelIds.includes(label.id) &&
+    label.name.toLowerCase().includes(labelSearchTerm.toLowerCase())
+  )
+
+  const exactMatch = allLabels.find(label =>
+    label.name.toLowerCase() === labelSearchTerm.toLowerCase()
+  )
 
   const handleSave = async () => {
     setSaving(true)
@@ -459,11 +510,19 @@ export default function ContactDetailsPage({ params }: { params: Promise<{ id: s
             <label className="block text-sm font-medium text-gray-700 mb-2">Labels</label>
             {!editMode ? (
               <div className="text-gray-900">
-                {contact.labels ? (
+                {contact.labels && contact.labels.length > 0 ? (
                   <div className="flex flex-wrap gap-1">
-                    {contact.labels.split(',').map((label, index) => (
-                      <span key={index} className={`px-2 py-1 text-xs rounded-full font-medium ${getLabelColor(label.trim())}`}>
-                        {label.trim()}
+                    {contact.labels.map(({ label }) => (
+                      <span
+                        key={label.id}
+                        className={`px-2 py-1 text-xs rounded-full font-medium`}
+                        style={{
+                          backgroundColor: label.color ? `${label.color}20` : '#e5e7eb',
+                          color: label.color || '#374151',
+                          border: `1px solid ${label.color || '#d1d5db'}`
+                        }}
+                      >
+                        {label.name}
                       </span>
                     ))}
                   </div>
@@ -473,49 +532,104 @@ export default function ContactDetailsPage({ params }: { params: Promise<{ id: s
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={newLabel}
-                    onChange={(e) => setNewLabel(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        addLabel()
-                      }
-                    }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-gray-900"
-                    placeholder="Add a label (e.g., hot-lead, vip)"
-                  />
-                  <button
-                    type="button"
-                    onClick={addLabel}
-                    className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                  >
-                    Add
-                  </button>
-                </div>
-                {getLabelsArray().length > 0 && (
-                  <div className="flex flex-wrap gap-2 p-3 border border-gray-200 rounded-lg bg-gray-50">
-                    {getLabelsArray().map((label, index) => (
-                      <span
-                        key={index}
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getLabelColor(label)}`}
-                      >
-                        {label}
+                <div className="relative" ref={labelDropdownRef}>
+                  <div className="min-h-[42px] px-3 py-2 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-indigo-500 bg-white">
+                    <div className="flex flex-wrap gap-2">
+                      {formData.labelIds.map(labelId => {
+                        const label = allLabels.find(l => l.id === labelId)
+                        if (!label) return null
+                        return (
+                          <span
+                            key={labelId}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
+                            style={{
+                              backgroundColor: label.color ? `${label.color}20` : '#e5e7eb',
+                              color: label.color || '#374151',
+                              border: `1px solid ${label.color || '#d1d5db'}`
+                            }}
+                          >
+                            {label.name}
+                            <button
+                              type="button"
+                              onClick={() => removeLabel(labelId)}
+                              className="ml-1 hover:bg-black hover:bg-opacity-10 rounded-full p-0.5"
+                            >
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </span>
+                        )
+                      })}
+                      <input
+                        type="text"
+                        value={labelSearchTerm}
+                        onChange={(e) => {
+                          setLabelSearchTerm(e.target.value)
+                          setShowLabelDropdown(true)
+                        }}
+                        onFocus={() => setShowLabelDropdown(true)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            if (filteredLabels.length === 1) {
+                              addExistingLabel(filteredLabels[0].id)
+                            } else if (labelSearchTerm.trim() && !exactMatch) {
+                              createAndAddLabel()
+                            }
+                          } else if (e.key === 'Escape') {
+                            setShowLabelDropdown(false)
+                            setLabelSearchTerm('')
+                          }
+                        }}
+                        className="flex-1 min-w-[120px] outline-none text-sm text-gray-900"
+                        placeholder="Add labels..."
+                      />
+                    </div>
+                  </div>
+
+                  {showLabelDropdown && (labelSearchTerm || filteredLabels.length > 0) && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+                      {filteredLabels.length > 0 ? (
+                        <div className="py-1">
+                          {filteredLabels.map(label => (
+                            <button
+                              key={label.id}
+                              type="button"
+                              onClick={() => addExistingLabel(label.id)}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                            >
+                              <span
+                                className="px-2 py-1 rounded-full text-xs font-medium"
+                                style={{
+                                  backgroundColor: label.color ? `${label.color}20` : '#e5e7eb',
+                                  color: label.color || '#374151',
+                                  border: `1px solid ${label.color || '#d1d5db'}`
+                                }}
+                              >
+                                {label.name}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {labelSearchTerm.trim() && !exactMatch && (
                         <button
                           type="button"
-                          onClick={() => removeLabel(label)}
-                          className="ml-1 hover:bg-black hover:bg-opacity-10 rounded-full p-0.5"
+                          onClick={createAndAddLabel}
+                          disabled={creatingNewLabel}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 border-t border-gray-200 flex items-center gap-2 text-indigo-600"
                         >
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                           </svg>
+                          {creatingNewLabel ? 'Creating...' : `Create "${labelSearchTerm}"`}
                         </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

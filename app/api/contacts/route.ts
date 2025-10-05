@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
         { name: { contains: search } },
         { email: { contains: search } },
         { jobTitle: { contains: search } },
-        { labels: { contains: search } },
+        { labels: { some: { label: { name: { contains: search } } } } },
         { companies: { some: { company: { name: { contains: search } } } } },
         { teamMembers: { some: { teamMember: { name: { contains: search } } } } },
       ]

@@ -22,7 +22,6 @@ model Contact {
   jobTitle          String?
   linkedinUrl       String?
   referrer          String?
-  labels            String?
   crmId             String?
   cadence           String    @default("3_MONTHS")
   lastTouchDate     DateTime  @default(now())
@@ -33,6 +32,7 @@ model Contact {
 
   companies         ContactCompany[]
   teamMembers       ContactTeamMember[]
+  labels            ContactLabel[]
   interactions      Interaction[]
   followUps         FollowUp[]
 
@@ -43,7 +43,6 @@ model Contact {
   @@index([email])
   @@index([name])
   @@index([lastName])
-  @@index([labels])
   @@map("contacts")
 }
 
@@ -67,48 +66,80 @@ model ContactTeamMember {
   id           String     @id @default(cuid())
   contactId    String
   teamMemberId String
-  
+
   contact      Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
   teamMember   TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
-  
+
   createdAt    DateTime   @default(now())
-  
+
   @@unique([contactId, teamMemberId])
   @@index([contactId])
   @@index([teamMemberId])
   @@map("contact_team_members")
 }
 
+model Label {
+  id              String         @id @default(cuid())
+  name            String         @unique
+  color           String?
+  pipedriveId     Int?           @unique
+
+  contacts        ContactLabel[]
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@map("labels")
+}
+
+model ContactLabel {
+  id        String   @id @default(cuid())
+  contactId String
+  labelId   String
+
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  label     Label    @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([contactId, labelId])
+  @@index([contactId])
+  @@index([labelId])
+  @@map("contact_labels")
+}
+
 model Company {
-  id         String           @id @default(cuid())
-  name       String
-  website    String?
-  industry   String?
-  size       String?
-  
-  contacts   ContactCompany[]
-  
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
-  
+  id           String           @id @default(cuid())
+  name         String
+  website      String?
+  industry     String?
+  size         String?
+  customFields Json?
+
+  contacts     ContactCompany[]
+
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
   @@map("companies")
 }
 
 model Interaction {
-  id           String     @id @default(cuid())
-  contactId    String
-  teamMemberId String
-  type         String
-  subject      String?
-  content      String     @db.Text
-  outcome      String?    @db.Text
-  interactionDate DateTime @default(now())
+  id              String     @id @default(cuid())
+  contactId       String
+  teamMemberId    String
+  type            String
+  subject         String?
+  content         String     @db.Text
+  outcome         String?    @db.Text
+  interactionDate DateTime   @default(now())
+  customFields    Json?
 
-  contact      Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id])
+  contact         Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  teamMember      TeamMember @relation(fields: [teamMemberId], references: [id])
 
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   @@index([contactId, interactionDate])
   @@map("interactions")
