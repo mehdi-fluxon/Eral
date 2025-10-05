@@ -203,10 +203,6 @@ export async function GET(request: NextRequest) {
           },
           teamMembers: {
             include: { teamMember: true }
-          },
-          notes: {
-            orderBy: { createdAt: 'desc' },
-            take: 1
           }
         },
         orderBy: [
@@ -244,11 +240,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { 
-      name, 
-      email, 
+    const {
+      name,
+      firstName,
+      lastName,
+      email,
       jobTitle,
-      linkedinUrl, 
+      linkedinUrl,
       referrer,
       labels,
       crmId,
@@ -269,6 +267,8 @@ export async function POST(request: NextRequest) {
 
     const contactData: Prisma.ContactCreateInput = {
       name,
+      firstName: firstName || null,
+      lastName: lastName || null,
       email,
       jobTitle: jobTitle || null,
       linkedinUrl: linkedinUrl || null,

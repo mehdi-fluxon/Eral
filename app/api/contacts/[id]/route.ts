@@ -101,10 +101,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         teamMembers: {
           include: { teamMember: true }
         },
-        notes: {
-          include: { teamMember: true },
-          orderBy: { createdAt: 'desc' }
-        },
         interactions: {
           include: { teamMember: true },
           orderBy: { interactionDate: 'desc' }
@@ -132,11 +128,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params
     const body = await request.json()
-    const { 
-      name, 
-      email, 
+    const {
+      name,
+      firstName,
+      lastName,
+      email,
       jobTitle,
-      linkedinUrl, 
+      linkedinUrl,
       referrer,
       labels,
       crmId,
@@ -146,7 +144,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       generalNotes,
       customFields,
       companyIds,
-      teamMemberIds 
+      teamMemberIds
     } = body
 
     const existingContact = await prisma.contact.findUnique({
@@ -176,6 +174,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const updateData: Prisma.ContactUpdateInput = {}
 
     if (name) updateData.name = name
+    if (firstName !== undefined) updateData.firstName = firstName || null
+    if (lastName !== undefined) updateData.lastName = lastName || null
     if (email) updateData.email = email
     if (jobTitle !== undefined) updateData.jobTitle = jobTitle || null
     if (linkedinUrl !== undefined) updateData.linkedinUrl = linkedinUrl || null

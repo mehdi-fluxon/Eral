@@ -272,7 +272,9 @@ export function generateAgentTools() {
       name: "create_contact",
       description: "Create a new contact with associated companies and team members. IMPORTANT: Always include the current user's team member ID in teamMemberIds unless user explicitly assigns to someone else.",
       parameters: z.object({
-        name: z.string().describe("Contact name"),
+        name: z.string().describe("Contact full name"),
+        firstName: z.string().nullable().optional().describe("First name (optional, for better personalization)"),
+        lastName: z.string().nullable().optional().describe("Last name (optional, for sorting)"),
         email: z.string().email().describe("Contact email"),
         jobTitle: z.string().nullable().optional().describe("Job title"),
         linkedinUrl: z.string().nullable().optional().describe("LinkedIn profile URL"),
@@ -302,7 +304,9 @@ export function generateAgentTools() {
       description: "Update contact information and associations. IMPORTANT: Only include fields you want to change. Omit companyIds and teamMemberIds to preserve existing relationships.",
       parameters: z.object({
         id: z.string().describe("Contact ID"),
-        name: z.string().nullable().optional().describe("Contact name"),
+        name: z.string().nullable().optional().describe("Contact full name"),
+        firstName: z.string().nullable().optional().describe("First name"),
+        lastName: z.string().nullable().optional().describe("Last name"),
         email: z.string().email().nullable().optional().describe("Contact email"),
         jobTitle: z.string().nullable().optional().describe("Job title"),
         linkedinUrl: z.string().nullable().optional().describe("LinkedIn profile URL"),

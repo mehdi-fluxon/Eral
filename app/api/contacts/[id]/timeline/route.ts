@@ -38,41 +38,24 @@ export async function GET(
   try {
     const { id } = await params
 
-    const [notes, interactions] = await Promise.all([
-      prisma.note.findMany({
-        where: { contactId: id },
-        include: { teamMember: true },
-        orderBy: { createdAt: 'desc' }
-      }),
-      prisma.interaction.findMany({
-        where: { contactId: id },
-        include: { teamMember: true },
-        orderBy: { interactionDate: 'desc' }
-      })
-    ])
+    const interactions = await prisma.interaction.findMany({
+      where: { contactId: id },
+      include: { teamMember: true },
+      orderBy: { interactionDate: 'desc' }
+    })
 
-    const timeline = [
-      ...notes.map(note => ({
-        id: note.id,
-        type: 'note' as const,
-        content: note.content,
-        teamMember: note.teamMember,
-        date: note.createdAt,
-        createdAt: note.createdAt
-      })),
-      ...interactions.map(interaction => ({
-        id: interaction.id,
-        type: 'interaction' as const,
-        interactionType: interaction.type,
-        subject: interaction.subject,
-        content: interaction.content,
-        outcome: interaction.outcome,
-        teamMember: interaction.teamMember,
-        date: interaction.interactionDate,
-        createdAt: interaction.createdAt,
-        updatedAt: interaction.updatedAt
-      }))
-    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    const timeline = interactions.map(interaction => ({
+      id: interaction.id,
+      type: interaction.type === 'NOTE' ? 'note' : 'interaction',
+      interactionType: interaction.type,
+      subject: interaction.subject,
+      content: interaction.content,
+      outcome: interaction.outcome,
+      teamMember: interaction.teamMember,
+      date: interaction.interactionDate,
+      createdAt: interaction.createdAt,
+      updatedAt: interaction.updatedAt
+    }))
 
     return NextResponse.json(timeline)
   } catch (error) {

@@ -39,7 +39,7 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    await prisma.note.delete({
+    await prisma.interaction.delete({
       where: { id }
     })
 

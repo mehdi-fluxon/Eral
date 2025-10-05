@@ -55,14 +55,16 @@ export async function POST(
     // Use provided noteDate or default to now
     const timestamp = noteDate ? new Date(noteDate) : new Date()
 
-    // Create note and update contact's lastTouchDate in a transaction
+    // Create note (as interaction) and update contact's lastTouchDate in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Create the note with custom timestamp
-      const note = await tx.note.create({
+      // Create the interaction with type 'NOTE' and custom timestamp
+      const note = await tx.interaction.create({
         data: {
           contactId,
           teamMemberId,
+          type: 'NOTE',
           content,
+          interactionDate: timestamp,
           createdAt: timestamp
         },
         include: {

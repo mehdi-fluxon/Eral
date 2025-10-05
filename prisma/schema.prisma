@@ -16,6 +16,8 @@ datasource db {
 model Contact {
   id                String    @id @default(cuid())
   name              String
+  firstName         String?
+  lastName          String?
   email             String
   jobTitle          String?
   linkedinUrl       String?
@@ -28,19 +30,19 @@ model Contact {
   generalNotes      String?   @db.Text
   customFields      Json?
   lastContactAt     DateTime?
-  
+
   companies         ContactCompany[]
   teamMembers       ContactTeamMember[]
-  notes             Note[]
   interactions      Interaction[]
   followUps         FollowUp[]
-  
+
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   @@index([nextReminderDate])
   @@index([email])
   @@index([name])
+  @@index([lastName])
   @@index([labels])
   @@map("contacts")
 }
@@ -92,21 +94,6 @@ model Company {
   @@map("companies")
 }
 
-model Note {
-  id           String     @id @default(cuid())
-  contactId    String
-  teamMemberId String
-  content      String     @db.Text
-  
-  contact      Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id])
-  
-  createdAt    DateTime   @default(now())
-
-  @@index([contactId, createdAt])
-  @@map("notes")
-}
-
 model Interaction {
   id           String     @id @default(cuid())
   contactId    String
@@ -116,10 +103,10 @@ model Interaction {
   content      String     @db.Text
   outcome      String?    @db.Text
   interactionDate DateTime @default(now())
-  
+
   contact      Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
   teamMember   TeamMember @relation(fields: [teamMemberId], references: [id])
-  
+
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -133,7 +120,6 @@ model TeamMember {
   email        String               @unique
   userId       String?              @unique
   contacts     ContactTeamMember[]
-  notes        Note[]
   interactions Interaction[]
   user         User?                @relation(fields: [userId], references: [id])
   createdAt    DateTime             @default(now())
