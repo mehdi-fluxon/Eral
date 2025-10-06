@@ -83,7 +83,6 @@ interface PipedrivePerson {
 interface PipedriveActivity {
   id: number
   type: string
-  subject: string
   note: string | null
   done: boolean
   due_date: string
@@ -519,25 +518,17 @@ async function createInteraction(
     })
 
     if (existing) {
-      log('⏭️ ', `Interaction exists: ${activity.subject || activity.type} (ID: ${activity.id})`)
+      log('⏭️ ', `Interaction exists: ${activity.type} (ID: ${activity.id})`)
       stats.interactions.skipped++
       return
     }
 
-    // Build content
-    let content = activity.subject || ''
-    if (activity.note) {
-      content += content ? `\n\n${activity.note}` : activity.note
-    }
-    if (!content) {
-      content = `${activity.type} activity`
-    }
-
-    const outcome = activity.done ? 'Completed' : 'Pending'
+    // Build content from note or default to activity type
+    const content = activity.note || `${activity.type} activity`
     const interactionDate = parsePipedriveDate(activity.due_date) || new Date()
 
     if (dryRun) {
-      log('🔍', `[DRY RUN] Would create interaction: ${activity.subject || activity.type}`)
+      log('🔍', `[DRY RUN] Would create interaction: ${activity.type}`)
       stats.interactions.created++
       return
     }
@@ -547,15 +538,13 @@ async function createInteraction(
         contactId,
         teamMemberId,
         type: activity.type,
-        subject: activity.subject || null,
         content,
-        outcome,
         interactionDate,
         pipedriveActivityId: activity.id
       }
     })
 
-    log('✅', `Created interaction: ${activity.subject || activity.type}`)
+    log('✅', `Created interaction: ${activity.type}`)
     stats.interactions.created++
   } catch (error) {
     log('❌', `Error creating interaction ${activity.id}: ${error}`)

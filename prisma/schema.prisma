@@ -130,9 +130,7 @@ model Interaction {
   contactId           String
   teamMemberId        String
   type                String
-  subject             String?
   content             String     @db.Text
-  outcome             String?    @db.Text
   interactionDate     DateTime   @default(now())
   pipedriveActivityId Int?
   customFields        Json?

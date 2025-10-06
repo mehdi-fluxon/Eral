@@ -26,11 +26,7 @@ import { Prisma } from '@prisma/client'
  *               type:
  *                 type: string
  *                 enum: [EMAIL, CALL, MEETING, LINKEDIN, FOLLOWUP, PROPOSAL, OTHER]
- *               subject:
- *                 type: string
  *               content:
- *                 type: string
- *               outcome:
  *                 type: string
  *               interactionDate:
  *                 type: string
@@ -83,18 +79,14 @@ export async function PATCH(
     const { id } = await params
     const {
       type,
-      subject,
       content,
-      outcome,
       interactionDate
     } = await request.json()
 
     const updateData: Prisma.InteractionUpdateInput = {}
-    
+
     if (type) updateData.type = type
-    if (subject !== undefined) updateData.subject = subject || null
     if (content) updateData.content = content
-    if (outcome !== undefined) updateData.outcome = outcome || null
     if (interactionDate) updateData.interactionDate = new Date(interactionDate)
 
     const interaction = await prisma.interaction.update({

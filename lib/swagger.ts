@@ -262,22 +262,10 @@ const options: swaggerJSDoc.Options = {
               enum: ['EMAIL', 'CALL', 'MEETING', 'LINKEDIN', 'FOLLOWUP', 'PROPOSAL', 'OTHER'],
               description: 'Type of interaction'
             },
-            subject: {
-              type: 'string',
-              nullable: true,
-              description: 'Interaction subject/title',
-              example: 'Q4 Planning Discussion'
-            },
             content: {
               type: 'string',
               description: 'Interaction details',
               example: 'Discussed quarterly planning and budget allocation'
-            },
-            outcome: {
-              type: 'string',
-              nullable: true,
-              description: 'Interaction outcome or next steps',
-              example: 'Scheduled follow-up meeting for next week'
             },
             interactionDate: {
               type: 'string',
@@ -516,17 +504,9 @@ const options: swaggerJSDoc.Options = {
               enum: ['EMAIL', 'CALL', 'MEETING', 'LINKEDIN', 'FOLLOWUP', 'PROPOSAL', 'OTHER'],
               description: 'Type of interaction'
             },
-            subject: {
-              type: 'string',
-              description: 'Interaction subject'
-            },
             content: {
               type: 'string',
               description: 'Interaction details'
-            },
-            outcome: {
-              type: 'string',
-              description: 'Interaction outcome'
             },
             interactionDate: {
               type: 'string',

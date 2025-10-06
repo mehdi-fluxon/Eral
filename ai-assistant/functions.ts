@@ -372,9 +372,7 @@ export function generateAgentTools() {
       parameters: z.object({
         contactId: z.string().describe("Contact ID"),
         type: interactionTypeEnum.describe("Type of interaction"),
-        subject: z.string().nullable().optional().describe("Interaction subject"),
         content: z.string().describe("Interaction details"),
-        outcome: z.string().nullable().optional().describe("Interaction outcome"),
         interactionDate: z.string().nullable().optional().describe("Interaction date (YYYY-MM-DD), defaults to today"),
         teamMemberId: z.string().describe("ID of team member logging the interaction"),
         updateLastTouch: z.boolean().default(true).nullable().optional().describe("Whether to update contact last touch date and recalculate reminder (defaults to true)")
@@ -388,9 +386,7 @@ export function generateAgentTools() {
       parameters: z.object({
         id: z.string().describe("Interaction ID"),
         type: interactionTypeEnum.nullable().optional().describe("Type of interaction"),
-        subject: z.string().nullable().optional().describe("Interaction subject"),
         content: z.string().nullable().optional().describe("Interaction details"),
-        outcome: z.string().nullable().optional().describe("Interaction outcome"),
         interactionDate: z.string().nullable().optional().describe("Interaction date (YYYY-MM-DD)")
       }),
       execute: async (args: any) => executeFunction('update_interaction', args)

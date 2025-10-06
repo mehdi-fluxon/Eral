@@ -46,9 +46,7 @@ export async function POST(
     const { id: contactId } = await params
     const {
       type,
-      subject,
       content,
-      outcome,
       interactionDate,
       teamMemberId,
       updateLastTouch
@@ -68,9 +66,7 @@ export async function POST(
         contactId,
         teamMemberId,
         type,
-        subject: subject || null,
         content,
-        outcome: outcome || null,
         interactionDate: date
       },
       include: {
