@@ -22,13 +22,19 @@ export class SlackClient {
 
   private async getTeamMemberIdByEmail(email: string): Promise<string | null> {
     try {
+      console.log('🔍 [Slack] Searching team members API with email:', email)
       const result = await executeFunction('search_team_members', { search: email })
+      console.log('🔍 [Slack] API response:', JSON.stringify(result, null, 2))
+
       if (result.teamMembers && result.teamMembers.length > 0) {
+        console.log('✅ [Slack] Found team members:', result.teamMembers.length)
         return result.teamMembers[0].id
       }
+
+      console.log('❌ [Slack] No team members in API response')
       return null
     } catch (error) {
-      console.error('Error looking up team member by email:', error)
+      console.error('❌ [Slack] Error looking up team member by email:', error)
       return null
     }
   }

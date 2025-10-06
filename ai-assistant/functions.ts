@@ -14,6 +14,9 @@ const getHeaders = () => {
   // Add internal API key for server-to-server authentication
   if (process.env.INTERNAL_API_KEY) {
     headers['x-internal-api-key'] = process.env.INTERNAL_API_KEY
+    console.log('🔐 [API] Using INTERNAL_API_KEY:', process.env.INTERNAL_API_KEY.substring(0, 10) + '...')
+  } else {
+    console.log('⚠️ [API] INTERNAL_API_KEY not set!')
   }
 
   return headers
