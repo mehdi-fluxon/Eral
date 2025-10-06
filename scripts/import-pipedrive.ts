@@ -341,8 +341,9 @@ async function createContact(
   person: PipedrivePerson,
   teamMemberId: string | null,
   companyId: string | null,
-  stats: Stats
-): Promise<string | null> {
+  stats: Stats,
+  skipRelationshipUpdates: boolean = false
+): Promise<{ contactId: string | null; wasCreated: boolean }> {
   try {
     const crmId = String(person.id)
 
@@ -355,8 +356,8 @@ async function createContact(
       log('⏭️ ', `Contact exists: ${person.name} (CRM ID: ${crmId})`)
       stats.contacts.skipped++
 
-      // Update relationships if they've changed in Pipedrive (only in non-dry-run mode)
-      if (!dryRun) {
+      // Update relationships if they've changed in Pipedrive (only in non-dry-run and non-sync mode)
+      if (!dryRun && !skipRelationshipUpdates) {
         // Sync labels
         if (person.label_ids && person.label_ids.length > 0) {
           const labelConnections = person.label_ids
@@ -406,7 +407,7 @@ async function createContact(
         }
       }
 
-      return existing.id
+      return { contactId: existing.id, wasCreated: false }
     }
 
     // Calculate lastTouchDate
@@ -438,7 +439,7 @@ async function createContact(
     if (dryRun) {
       log('🔍', `[DRY RUN] Would create contact: ${person.name} (${email})`)
       stats.contacts.created++
-      return 'dry-run-id'
+      return { contactId: 'dry-run-id', wasCreated: true }
     }
 
     // Build label connections
@@ -472,11 +473,11 @@ async function createContact(
 
     log('✅', `Created contact: ${person.name}${labelConnections.length > 0 ? ` (${labelConnections.length} labels)` : ''}`)
     stats.contacts.created++
-    return contact.id
+    return { contactId: contact.id, wasCreated: true }
   } catch (error) {
     log('❌', `Error creating contact ${person.name}: ${error}`)
     stats.contacts.errors++
-    return null
+    return { contactId: null, wasCreated: false }
   }
 }
 
@@ -488,15 +489,9 @@ async function createInteraction(
   stats: Stats
 ): Promise<void> {
   try {
-    // Check if exists by querying all interactions for this contact and checking pipedriveActivityId
-    const existingInteractions = await prisma.interaction.findMany({
-      where: { contactId },
-      select: { id: true, customFields: true }
-    })
-
-    const existing = existingInteractions.find(interaction => {
-      const customFields = interaction.customFields as any
-      return customFields?.pipedriveActivityId === activity.id
+    // Check if exists using the dedicated pipedriveActivityId field
+    const existing = await prisma.interaction.findUnique({
+      where: { pipedriveActivityId: activity.id }
     })
 
     if (existing) {
@@ -532,9 +527,7 @@ async function createInteraction(
         content,
         outcome,
         interactionDate,
-        customFields: {
-          pipedriveActivityId: activity.id
-        }
+        pipedriveActivityId: activity.id
       }
     })
 
@@ -611,10 +604,15 @@ async function main() {
       }
 
       // Step 3: Create Contact
-      const contactId = await createContact(person, teamMemberId, companyId, stats)
+      const result = await createContact(person, teamMemberId, companyId, stats, syncOnly)
+      const { contactId, wasCreated } = result
 
       // Step 4: Fetch and create activities
-      if (contactId && contactId !== 'dry-run-id' && teamMemberId && teamMemberId !== 'dry-run-id') {
+      // In sync mode, only fetch activities for newly created contacts
+      const shouldFetchActivities = contactId && contactId !== 'dry-run-id' && teamMemberId && teamMemberId !== 'dry-run-id'
+      const shouldProcessActivities = shouldFetchActivities && (!syncOnly || wasCreated)
+
+      if (shouldProcessActivities) {
         try {
           const activities: PipedriveActivity[] = await fetchPipedrive(`/persons/${person.id}/activities`)
 
