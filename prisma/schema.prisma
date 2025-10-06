@@ -18,7 +18,7 @@ model Contact {
   name              String
   firstName         String?
   lastName          String?
-  email             String
+  email             String?
   jobTitle          String?
   linkedinUrl       String?
   referrer          String?

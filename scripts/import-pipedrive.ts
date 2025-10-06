@@ -457,10 +457,10 @@ async function createContact(
       }
     })
 
-    const email = person.email[0]?.value || `noemail-${person.id}@pipedrive.import`
+    const email = person.email[0]?.value || null
 
     if (dryRun) {
-      log('🔍', `[DRY RUN] Would create contact: ${person.name} (${email})`)
+      log('🔍', `[DRY RUN] Would create contact: ${person.name}${email ? ` (${email})` : ' (no email)'}`)
       stats.contacts.created++
       return { contactId: 'dry-run-id', wasCreated: true }
     }
@@ -602,8 +602,11 @@ async function main() {
     }
 
     // Process each person
-    for (const person of personsToProcess) {
-      log('👤', `Processing: ${person.name}`)
+    for (let i = 0; i < personsToProcess.length; i++) {
+      const person = personsToProcess[i]
+      const progress = `[${i + 1}/${personsToProcess.length}]`
+
+      log('👤', `${progress} Processing: ${person.name} (Pipedrive ID: ${person.id})`)
 
       // Step 1: Create Team Member
       let teamMemberId: string | null = null
