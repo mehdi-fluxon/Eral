@@ -354,6 +354,58 @@ async function createContact(
     if (existing) {
       log('⏭️ ', `Contact exists: ${person.name} (CRM ID: ${crmId})`)
       stats.contacts.skipped++
+
+      // Update relationships if they've changed in Pipedrive (only in non-dry-run mode)
+      if (!dryRun) {
+        // Sync labels
+        if (person.label_ids && person.label_ids.length > 0) {
+          const labelConnections = person.label_ids
+            .map(pdLabelId => labelCache.get(pdLabelId))
+            .filter(labelId => labelId && labelId !== 'dry-run-id')
+
+          const existingLabels = await prisma.contactLabel.findMany({
+            where: { contactId: existing.id },
+            select: { labelId: true }
+          })
+          const existingLabelIds = new Set(existingLabels.map(l => l.labelId))
+
+          const newLabels = labelConnections.filter(labelId => !existingLabelIds.has(labelId as string))
+          if (newLabels.length > 0) {
+            await prisma.contactLabel.createMany({
+              data: newLabels.map(labelId => ({ contactId: existing.id, labelId: labelId as string })),
+              skipDuplicates: true
+            })
+            log('  ✅', `Added ${newLabels.length} new labels`)
+          }
+        }
+
+        // Sync company relationship
+        if (companyId) {
+          const existingCompany = await prisma.contactCompany.findFirst({
+            where: { contactId: existing.id, companyId }
+          })
+          if (!existingCompany) {
+            await prisma.contactCompany.create({
+              data: { contactId: existing.id, companyId }
+            })
+            log('  ✅', `Linked to company`)
+          }
+        }
+
+        // Sync team member relationship
+        if (teamMemberId) {
+          const existingTeamMember = await prisma.contactTeamMember.findFirst({
+            where: { contactId: existing.id, teamMemberId }
+          })
+          if (!existingTeamMember) {
+            await prisma.contactTeamMember.create({
+              data: { contactId: existing.id, teamMemberId }
+            })
+            log('  ✅', `Linked to team member`)
+          }
+        }
+      }
+
       return existing.id
     }
 
