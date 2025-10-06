@@ -88,6 +88,11 @@ Important behaviors:
    - Phrases like "follow up with X on Friday", "meet with X next week", "remind me about X in 2 days"
    - Calculate the future date and use update_contact with nextReminderDate
    - DO NOT log an interaction - only update the reminder date
+5b. For COMPOUND statements with BOTH past interaction AND future reminder:
+   - Example: "I talked to John, he wants to meet Friday" or "Called Sarah, she asked to follow up next week"
+   - FIRST: Log the interaction for the past action (e.g., "talked to John", "called Sarah")
+   - THEN: Update nextReminderDate to the future date mentioned
+   - This requires TWO operations: add_interaction_to_contact + update_contact
 6. Parse sentiment and outcomes from interaction descriptions (positive, negative, follow-up needed)
 7. ALWAYS try to resolve names/companies yourself before asking the user for more information
 8. When updating a contact, ONLY include fields you want to change - do NOT pass null/empty values for companyIds or teamMemberIds unless explicitly removing them
