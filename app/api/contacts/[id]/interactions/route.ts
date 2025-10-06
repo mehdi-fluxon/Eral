@@ -46,15 +46,16 @@ export async function POST(
     const { id: contactId } = await params
     const {
       type,
+      subject,
       content,
       interactionDate,
       teamMemberId,
       updateLastTouch
     } = await request.json()
 
-    if (!type || !content || !teamMemberId) {
+    if (!type || !teamMemberId) {
       return NextResponse.json(
-        { error: 'Type, content, and team member are required' },
+        { error: 'Type and team member are required' },
         { status: 400 }
       )
     }
@@ -66,7 +67,8 @@ export async function POST(
         contactId,
         teamMemberId,
         type,
-        content,
+        subject: subject || null,
+        content: content || '',
         interactionDate: date
       },
       include: {

@@ -79,6 +79,7 @@ export async function PATCH(
     const { id } = await params
     const {
       type,
+      subject,
       content,
       interactionDate
     } = await request.json()
@@ -86,7 +87,8 @@ export async function PATCH(
     const updateData: Prisma.InteractionUpdateInput = {}
 
     if (type) updateData.type = type
-    if (content) updateData.content = content
+    if (subject !== undefined) updateData.subject = subject || null
+    if (content !== undefined) updateData.content = content
     if (interactionDate) updateData.interactionDate = new Date(interactionDate)
 
     const interaction = await prisma.interaction.update({

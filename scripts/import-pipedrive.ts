@@ -13,6 +13,7 @@
  *   --dry-run           Preview what would be imported without creating records
  *   --sync              Only import contacts not already in the database (default limit: 1000)
  *   --notes-only        Only import notes for existing contacts (default limit: 1000)
+ *   --contact-id=N      Update/import a single contact by Pipedrive CRM ID (overwrites existing data)
  *   --limit=N           Limit number of contacts to import (default: 10, or 1000 with --sync/--notes-only)
  *
  * Examples:
@@ -22,6 +23,7 @@
  *   npm run import:pipedrive --limit=50             # Import first 50 contacts (including existing)
  *   npm run import:pipedrive --notes-only           # Import notes for existing contacts (up to 1000)
  *   npm run import:pipedrive --notes-only --dry-run # Preview notes import for existing contacts
+ *   npm run import:pipedrive --contact-id=12345     # Update single contact with Pipedrive ID 12345
  *
  * Pagination:
  *   The script automatically fetches contacts in batches of 500 (Pipedrive's max per request).
@@ -45,6 +47,8 @@ const args = process.argv.slice(2)
 const dryRun = args.includes('--dry-run')
 const syncOnly = args.includes('--sync')
 const notesOnly = args.includes('--notes-only')
+const contactIdArg = args.find(arg => arg.startsWith('--contact-id='))
+const singleContactId = contactIdArg ? parseInt(contactIdArg.split('=')[1]) : null
 const limitArg = args.find(arg => arg.startsWith('--limit='))
 const limit = limitArg ? parseInt(limitArg.split('=')[1]) : (syncOnly || notesOnly ? 1000 : 10)
 
@@ -194,14 +198,6 @@ async function fetchPipedrive(endpoint: string): Promise<any> {
     throw new Error(`Pipedrive API error: ${response.status} ${response.statusText}`)
   }
 
-  // Warn if getting close to limits
-  if (dailyTokensRemaining !== null && dailyTokensRemaining < 1000) {
-    log('⚠️ ', `Warning: Only ${dailyTokensRemaining} daily tokens remaining`)
-  }
-  if (burstTokensRemaining !== null && burstTokensRemaining < 10) {
-    log('⚠️ ', `Warning: Only ${burstTokensRemaining} burst tokens remaining`)
-    await sleep(2000) // Extra delay if burst limit is low
-  }
 
   const data = await response.json()
   return data
@@ -422,6 +418,138 @@ async function createCompany(org: PipedriveOrg, stats: Stats): Promise<string | 
     log('❌', `Error creating company ${org.name}: ${error}`)
     stats.companies.errors++
     return null
+  }
+}
+
+// Step 3a: Update existing contact (overwrites all fields)
+async function updateContact(
+  person: PipedrivePerson,
+  teamMemberId: string | null,
+  companyId: string | null,
+  stats: Stats
+): Promise<{ contactId: string | null; wasCreated: boolean }> {
+  try {
+    const crmId = String(person.id)
+
+    // Find existing contact
+    const existing = await prisma.contact.findFirst({
+      where: { crmId }
+    })
+
+    if (!existing) {
+      log('❌', `Contact not found: ${person.name} (CRM ID: ${crmId})`)
+      return { contactId: null, wasCreated: false }
+    }
+
+    // Calculate lastTouchDate
+    const addTime = parsePipedriveDate(person.add_time)
+    const lastActivityDate = parsePipedriveDate(person.last_activity_date)
+    const lastOutgoingMailTime = parsePipedriveDate(person.last_outgoing_mail_time)
+    const lastTouchDate = getLatestDate(addTime, lastActivityDate, lastOutgoingMailTime)
+
+    // Calculate next reminder (keep existing cadence)
+    const contact = await prisma.contact.findUnique({
+      where: { id: existing.id },
+      select: { cadence: true }
+    })
+    const cadence = contact?.cadence || '3_MONTHS'
+    const nextReminderDate = calculateNextReminderDate(lastTouchDate, cadence)
+
+    // Extract custom fields
+    const customFields: any = {
+      phone: person.phone[0]?.value || '',
+      pipedriveLabels: person.label_ids,
+      pipedriveCompanyId: person.company_id
+    }
+
+    // Add custom fields with human-readable names
+    Object.keys(person).forEach(key => {
+      if (key.match(/^[a-f0-9]{40}$/)) {
+        const fieldName = customFieldCache.get(key)
+        if (fieldName && person[key]) {
+          customFields[fieldName] = person[key]
+        }
+      }
+    })
+
+    const email = person.email[0]?.value || null
+
+    if (dryRun) {
+      log('🔍', `[DRY RUN] Would update contact: ${person.name}${email ? ` (${email})` : ' (no email)'}`)
+      return { contactId: existing.id, wasCreated: false }
+    }
+
+    // Update contact
+    await prisma.contact.update({
+      where: { id: existing.id },
+      data: {
+        name: person.name,
+        firstName: person.first_name || null,
+        lastName: person.last_name || null,
+        email,
+        jobTitle: person.job_title || null,
+        lastTouchDate,
+        nextReminderDate,
+        customFields
+      }
+    })
+
+    log('✅', `Updated contact: ${person.name}`)
+    log('  📝', `Fields: name="${person.name}", email="${email}", jobTitle="${person.job_title || 'none'}"`)
+    log('  📝', `Custom fields: ${JSON.stringify(customFields)}`)
+
+    // Clear and rebuild relationships
+    // Clear existing labels
+    const deletedLabels = await prisma.contactLabel.deleteMany({
+      where: { contactId: existing.id }
+    })
+    log('  🗑️', `Cleared ${deletedLabels.count} existing labels`)
+
+    // Add new labels
+    const labelConnections = person.label_ids
+      .map(pdLabelId => labelCache.get(pdLabelId))
+      .filter(labelId => labelId && labelId !== 'dry-run-id')
+
+    log('  📝', `Pipedrive label IDs: [${person.label_ids.join(', ')}]`)
+    log('  📝', `Mapped to internal IDs: [${labelConnections.join(', ')}]`)
+
+    if (labelConnections.length > 0) {
+      await prisma.contactLabel.createMany({
+        data: labelConnections.map(labelId => ({ contactId: existing.id, labelId: labelId as string })),
+        skipDuplicates: true
+      })
+      log('  ✅', `Updated labels (${labelConnections.length})`)
+    } else {
+      log('  ℹ️', `No labels to add`)
+    }
+
+    // Clear and add company
+    await prisma.contactCompany.deleteMany({
+      where: { contactId: existing.id }
+    })
+    if (companyId) {
+      await prisma.contactCompany.create({
+        data: { contactId: existing.id, companyId }
+      })
+      log('  ✅', `Updated company`)
+    }
+
+    // Clear and add team member
+    await prisma.contactTeamMember.deleteMany({
+      where: { contactId: existing.id }
+    })
+    if (teamMemberId) {
+      await prisma.contactTeamMember.create({
+        data: { contactId: existing.id, teamMemberId }
+      })
+      log('  ✅', `Updated team member`)
+    }
+
+    return { contactId: existing.id, wasCreated: false }
+  } catch (error) {
+    log('❌', `Error updating contact ${person.name}: ${error}`)
+    stats.contacts.errors++
+    return { contactId: null, wasCreated: false }
   }
 }
 
@@ -672,7 +800,7 @@ async function createInteractionFromNote(
 
 // Main function
 async function main() {
-  log('🚀', `Starting Pipedrive import (limit: ${limit}, dry-run: ${dryRun}, sync-only: ${syncOnly}, notes-only: ${notesOnly})`)
+  log('🚀', `Starting Pipedrive import (limit: ${limit}, dry-run: ${dryRun}, sync-only: ${syncOnly}, notes-only: ${notesOnly}, contact-id: ${singleContactId || 'none'})`)
   log('', '')
 
   const stats: Stats = {
@@ -685,6 +813,106 @@ async function main() {
   }
 
   try {
+    // Handle single contact update mode
+    if (singleContactId) {
+      log('🔍', `Fetching single contact from Pipedrive (ID: ${singleContactId})...`)
+
+      await fetchCustomFieldDefinitions()
+      await syncLabels(stats)
+
+      const response = await fetchPipedrive(`/persons/${singleContactId}`)
+      if (!response.data) {
+        log('❌', `Contact not found in Pipedrive (ID: ${singleContactId})`)
+        process.exit(1)
+      }
+
+      const person: PipedrivePerson = response.data
+      log('✓', `Found contact: ${person.name}`)
+      log('  📝', `Raw Pipedrive data - label_ids: ${JSON.stringify(person.label_ids || [])}`)
+      log('  📝', `Raw Pipedrive data - email: ${JSON.stringify(person.email)}`)
+      log('  📝', `Raw Pipedrive data - job_title: ${person.job_title}`)
+      log('  📝', `Raw Pipedrive data - org_id: ${person.org_id ? JSON.stringify(person.org_id) : 'none'}`)
+      log('', '')
+
+      // Process team member
+      let teamMemberId: string | null = null
+      if (person.owner_id) {
+        teamMemberId = await createTeamMember(person.owner_id, stats)
+      }
+
+      // Process company
+      let companyId: string | null = null
+      if (person.org_id) {
+        companyId = await createCompany(person.org_id, stats)
+      }
+
+      // Update contact (overwrites all data)
+      const result = await updateContact(person, teamMemberId, companyId, stats)
+      if (!result.contactId || result.contactId === 'dry-run-id') {
+        log('❌', 'Failed to update contact')
+        process.exit(1)
+      }
+
+      const contactId = result.contactId
+
+      // Fetch and sync activities (interactions)
+      if (teamMemberId && teamMemberId !== 'dry-run-id') {
+        try {
+          log('', '')
+          log('📝', 'Fetching activities from Pipedrive...')
+          const activitiesResponse = await fetchPipedrive(`/persons/${singleContactId}/activities`)
+          const activities: PipedriveActivity[] = activitiesResponse.data || []
+
+          if (activities && activities.length > 0) {
+            log('✓', `Found ${activities.length} activities`)
+
+            for (const activity of activities) {
+              await createInteraction(activity, contactId, teamMemberId, stats)
+            }
+          } else {
+            log('ℹ️', 'No activities found')
+          }
+        } catch (error) {
+          log('❌', `Error fetching activities: ${error}`)
+        }
+      }
+
+      // Fetch and sync notes
+      if (teamMemberId && teamMemberId !== 'dry-run-id') {
+        try {
+          log('', '')
+          log('📝', 'Fetching notes from Pipedrive...')
+          const notesResponse = await fetchPipedrive(`/notes?person_id=${singleContactId}`)
+          const notes: PipedriveNote[] = notesResponse.data || []
+
+          if (notes && notes.length > 0) {
+            log('✓', `Found ${notes.length} notes`)
+
+            for (const note of notes) {
+              await createInteractionFromNote(note, contactId, teamMemberId, stats)
+            }
+          } else {
+            log('ℹ️', 'No notes found')
+          }
+        } catch (error) {
+          log('❌', `Error fetching notes: ${error}`)
+        }
+      }
+
+      log('', '')
+      log('✅', 'Single contact update complete!')
+      log('', '')
+      log('📊', 'Summary:')
+      Object.entries(stats).forEach(([category, counts]) => {
+        const total = counts.created + counts.skipped + counts.errors
+        if (total > 0) {
+          log('  ', `${category}: ${counts.created} created, ${counts.skipped} skipped, ${counts.errors} errors`)
+        }
+      })
+
+      return
+    }
+
     // Step 0: Fetch custom field definitions and sync labels (skip in notes-only mode)
     if (!notesOnly) {
       await fetchCustomFieldDefinitions()
