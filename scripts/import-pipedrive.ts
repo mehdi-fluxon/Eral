@@ -184,10 +184,31 @@ async function fetchPipedrive(endpoint: string): Promise<any> {
   return data.data || []
 }
 
-// Cache for labels
+// Cache for labels and custom fields
 const labelCache = new Map<number, string>() // pipedriveId -> labelId
+const customFieldCache = new Map<string, string>() // hash -> fieldName
 
-// Step 0: Sync Labels from Pipedrive
+// Step 0a: Fetch Custom Field Definitions from Pipedrive
+async function fetchCustomFieldDefinitions(): Promise<void> {
+  try {
+    log('🔧', 'Fetching custom field definitions from Pipedrive...')
+    const fields: any[] = await fetchPipedrive('/personFields')
+
+    // Map hash keys to field names
+    for (const field of fields) {
+      if (field.key && field.key.match(/^[a-f0-9]{40}$/)) {
+        customFieldCache.set(field.key, field.name)
+      }
+    }
+
+    log('✓', `Found ${customFieldCache.size} custom fields in Pipedrive`)
+    log('', '')
+  } catch (error) {
+    log('❌', `Error fetching custom field definitions: ${error}`)
+  }
+}
+
+// Step 0b: Sync Labels from Pipedrive
 async function syncLabels(stats: Stats): Promise<void> {
   try {
     log('🏷️ ', 'Fetching labels from Pipedrive...')
@@ -420,17 +441,20 @@ async function createContact(
     const cadence = '3_MONTHS'
     const nextReminderDate = calculateNextReminderDate(lastTouchDate, cadence)
 
-    // Extract custom fields (hash keys)
+    // Extract custom fields
     const customFields: any = {
       phone: person.phone[0]?.value || '',
       pipedriveLabels: person.label_ids,
       pipedriveCompanyId: person.company_id
     }
 
-    // Add all custom field hashes
+    // Add custom fields with human-readable names
     Object.keys(person).forEach(key => {
       if (key.match(/^[a-f0-9]{40}$/)) {
-        customFields[key] = person[key]
+        const fieldName = customFieldCache.get(key)
+        if (fieldName && person[key]) {
+          customFields[fieldName] = person[key]
+        }
       }
     })
 
@@ -490,7 +514,7 @@ async function createInteraction(
 ): Promise<void> {
   try {
     // Check if exists using the dedicated pipedriveActivityId field
-    const existing = await prisma.interaction.findUnique({
+    const existing = await prisma.interaction.findFirst({
       where: { pipedriveActivityId: activity.id }
     })
 
@@ -553,7 +577,8 @@ async function main() {
   }
 
   try {
-    // Step 0: Sync Labels
+    // Step 0: Fetch custom field definitions and sync labels
+    await fetchCustomFieldDefinitions()
     await syncLabels(stats)
 
     // If sync mode, get existing CRM IDs to filter out
@@ -620,7 +645,7 @@ async function main() {
             log('📝', `  Found ${activities.length} activities`)
 
             for (const activity of activities) {
-              await createInteraction(activity, contactId, teamMemberId, stats)
+              await createInteraction(activity, contactId as string, teamMemberId as string, stats)
             }
           }
         } catch (error) {

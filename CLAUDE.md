@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Important Rules
+
+**CRITICAL - Must follow always:**
+- ❌ **NEVER commit code without showing it to the user first**
+- ❌ **NEVER call Pipedrive API without explicit permission** (no `npm run import:pipedrive`, no `fetchPipedrive()` calls)
+- ❌ **NEVER use `prisma migrate reset` or drop the database** under any circumstances
+
 ## Project Overview
 
 LuxonAI is a professional contact relationship management (CRM) system with an AI-powered assistant. It helps users maintain and nurture professional relationships through automated follow-up reminders, interaction tracking, and natural language queries.
