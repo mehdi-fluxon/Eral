@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import DOMPurify from 'dompurify'
 import AddNoteModal from './AddNoteModal'
 import LogInteractionModal from './LogInteractionModal'
 import EditInteractionModal from './EditInteractionModal'
@@ -129,17 +130,36 @@ export default function ActivityTimeline({ contactId, onActivityAdded }: Activit
   }
 
   const renderContent = (content: string) => {
+    // Check if content contains HTML tags
+    const hasHtmlTags = /<[^>]+>/.test(content)
+
+    if (hasHtmlTags) {
+      // Sanitize HTML content from Pipedrive or other sources
+      const sanitized = DOMPurify.sanitize(content, {
+        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'span', 'div'],
+        ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style']
+      })
+
+      return (
+        <div
+          className="prose prose-sm max-w-none"
+          dangerouslySetInnerHTML={{ __html: sanitized }}
+        />
+      )
+    }
+
+    // Plain text with simple markdown-like formatting
     const lines = content.split('\n')
     return lines.map((line, idx) => {
       let processed = line
       processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      
+
       if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
         return (
           <li key={idx} className="ml-4" dangerouslySetInnerHTML={{ __html: processed.replace(/^[•-]\s*/, '') }} />
         )
       }
-      
+
       return <p key={idx} dangerouslySetInnerHTML={{ __html: processed }} />
     })
   }
