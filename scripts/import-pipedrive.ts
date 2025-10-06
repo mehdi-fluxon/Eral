@@ -4,6 +4,7 @@
  * Pipedrive Import Script
  *
  * Imports contacts, companies, team members, labels, and interactions from Pipedrive CRM.
+ * Supports pagination to fetch all contacts from Pipedrive (up to your specified limit).
  *
  * Usage:
  *   npm run import:pipedrive [options]
@@ -16,8 +17,15 @@
  * Examples:
  *   npm run import:pipedrive --dry-run              # Preview first 10 contacts
  *   npm run import:pipedrive --sync                 # Import only new contacts (up to 1000)
- *   npm run import:pipedrive --sync --limit=5000    # Import only new contacts (up to 5000)
+ *   npm run import:pipedrive --sync --limit=5000    # Import only new contacts (up to 5000, paginated)
  *   npm run import:pipedrive --limit=50             # Import first 50 contacts (including existing)
+ *
+ * Pagination:
+ *   The script automatically fetches contacts in batches of 500 (Pipedrive's max per request).
+ *   It continues fetching until either:
+ *   - The specified limit is reached
+ *   - All contacts have been fetched
+ *   - No more contacts are available
  *
  * Environment variables required:
  *   PIPEDRIVE_API_KEY    - Your Pipedrive API token
@@ -180,7 +188,50 @@ async function fetchPipedrive(endpoint: string): Promise<any> {
   }
 
   const data = await response.json()
-  return data.data || []
+  return data
+}
+
+// Fetch all persons with pagination support
+async function fetchAllPersons(limit: number): Promise<PipedrivePerson[]> {
+  const allPersons: PipedrivePerson[] = []
+  let start = 0
+  const batchSize = 500 // Pipedrive max per request
+  let hasMore = true
+  let totalFetched = 0
+
+  while (hasMore && totalFetched < limit) {
+    const currentBatchSize = Math.min(batchSize, limit - totalFetched)
+    log('📥', `Fetching batch ${Math.floor(totalFetched / batchSize) + 1} (${currentBatchSize} contacts, start: ${start})...`)
+
+    const response = await fetchPipedrive(`/persons?limit=${currentBatchSize}&start=${start}`)
+    const persons = response.data || []
+
+    if (persons.length === 0) {
+      hasMore = false
+      break
+    }
+
+    allPersons.push(...persons)
+    totalFetched += persons.length
+
+    // Check pagination info from response
+    const pagination = response.additional_data?.pagination
+    if (pagination && pagination.more_items_in_collection && pagination.next_start !== undefined) {
+      start = pagination.next_start
+      log('✓', `Fetched ${persons.length} contacts (${allPersons.length} total so far, more available)`)
+    } else {
+      hasMore = false
+      log('✓', `Fetched ${persons.length} contacts (${allPersons.length} total, no more available)`)
+    }
+
+    // If we've hit our limit, stop
+    if (totalFetched >= limit) {
+      log('✓', `Reached limit of ${limit} contacts`)
+      hasMore = false
+    }
+  }
+
+  return allPersons
 }
 
 // Cache for labels and custom fields
@@ -191,7 +242,8 @@ const customFieldCache = new Map<string, string>() // hash -> fieldName
 async function fetchCustomFieldDefinitions(): Promise<void> {
   try {
     log('🔧', 'Fetching custom field definitions from Pipedrive...')
-    const fields: any[] = await fetchPipedrive('/personFields')
+    const response = await fetchPipedrive('/personFields')
+    const fields: any[] = response.data || []
 
     // Map hash keys to field names
     for (const field of fields) {
@@ -211,7 +263,8 @@ async function fetchCustomFieldDefinitions(): Promise<void> {
 async function syncLabels(stats: Stats): Promise<void> {
   try {
     log('🏷️ ', 'Fetching labels from Pipedrive...')
-    const fields: any[] = await fetchPipedrive('/personFields')
+    const response = await fetchPipedrive('/personFields')
+    const fields: any[] = response.data || []
 
     // Find the label_ids field definition
     const labelField = fields.find(f => f.key === 'label_ids')
@@ -583,10 +636,10 @@ async function main() {
       log('', '')
     }
 
-    // Fetch persons from Pipedrive
-    log('📥', `Fetching ${limit} persons from Pipedrive...`)
-    const persons: PipedrivePerson[] = await fetchPipedrive(`/persons?limit=${limit}`)
-    log('✓', `Fetched ${persons.length} persons`)
+    // Fetch persons from Pipedrive with pagination
+    log('📥', `Fetching up to ${limit} persons from Pipedrive...`)
+    const persons: PipedrivePerson[] = await fetchAllPersons(limit)
+    log('✓', `Fetched ${persons.length} persons total`)
     log('', '')
 
     // Filter out existing contacts if in sync mode
@@ -631,7 +684,8 @@ async function main() {
 
       if (shouldProcessActivities) {
         try {
-          const activities: PipedriveActivity[] = await fetchPipedrive(`/persons/${person.id}/activities`)
+          const response = await fetchPipedrive(`/persons/${person.id}/activities`)
+          const activities: PipedriveActivity[] = response.data || []
 
           if (activities && activities.length > 0) {
             log('📝', `  Found ${activities.length} activities`)
