@@ -80,6 +80,12 @@ interface Stats {
   interactions: { created: number; skipped: number; errors: number }
 }
 
+// Rate limiting state
+let dailyTokensRemaining: number | null = null
+let burstTokensRemaining: number | null = null
+let requestCount = 0
+const MIN_DELAY_MS = 500 // 250ms between requests for burst protection (4 req/sec max)
+
 // Helpers
 function log(icon: string, message: string) {
   console.log(`${icon} ${message}`)
@@ -97,13 +103,56 @@ function getLatestDate(...dates: (Date | null)[]): Date {
   return new Date(Math.max(...validDates.map(d => d.getTime())))
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 async function fetchPipedrive(endpoint: string): Promise<any> {
+  // Rate limit protection: add delay between requests
+  if (requestCount > 0) {
+    await sleep(MIN_DELAY_MS)
+  }
+
   const url = `https://${PIPEDRIVE_DOMAIN}/api/v1${endpoint}`
   const separator = endpoint.includes('?') ? '&' : '?'
   const response = await fetch(`${url}${separator}api_token=${PIPEDRIVE_API_KEY}`)
+  requestCount++
+
+  // Parse rate limit headers
+  const dailyLimit = response.headers.get('x-ratelimit-limit')
+  const dailyRemaining = response.headers.get('x-ratelimit-remaining')
+  const burstRemaining = response.headers.get('x-burst-ratelimit-remaining')
+  const retryAfter = response.headers.get('retry-after')
+
+  if (dailyRemaining) dailyTokensRemaining = parseInt(dailyRemaining)
+  if (burstRemaining) burstTokensRemaining = parseInt(burstRemaining)
+
+  // Log rate limit info every 10 requests
+  if (requestCount % 10 === 0 && dailyRemaining && dailyLimit) {
+    const percentUsed = ((parseInt(dailyLimit) - parseInt(dailyRemaining)) / parseInt(dailyLimit) * 100).toFixed(1)
+    log('📊', `API tokens: ${dailyRemaining}/${dailyLimit} remaining (${percentUsed}% used)`)
+  }
+
+  // Handle rate limit errors
+  if (response.status === 429) {
+    const waitSeconds = retryAfter ? parseInt(retryAfter) : 60
+    log('⏳', `Rate limit hit! Waiting ${waitSeconds} seconds...`)
+    await sleep(waitSeconds * 1000)
+    // Retry the request
+    return fetchPipedrive(endpoint)
+  }
 
   if (!response.ok) {
     throw new Error(`Pipedrive API error: ${response.status} ${response.statusText}`)
+  }
+
+  // Warn if getting close to limits
+  if (dailyTokensRemaining !== null && dailyTokensRemaining < 1000) {
+    log('⚠️ ', `Warning: Only ${dailyTokensRemaining} daily tokens remaining`)
+  }
+  if (burstTokensRemaining !== null && burstTokensRemaining < 10) {
+    log('⚠️ ', `Warning: Only ${burstTokensRemaining} burst tokens remaining`)
+    await sleep(2000) // Extra delay if burst limit is low
   }
 
   const data = await response.json()
