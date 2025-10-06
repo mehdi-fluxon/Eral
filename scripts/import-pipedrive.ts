@@ -1,5 +1,29 @@
 #!/usr/bin/env node
 
+/**
+ * Pipedrive Import Script
+ *
+ * Imports contacts, companies, team members, labels, and interactions from Pipedrive CRM.
+ *
+ * Usage:
+ *   npm run import:pipedrive [options]
+ *
+ * Options:
+ *   --dry-run           Preview what would be imported without creating records
+ *   --sync              Only import contacts not already in the database (default limit: 1000)
+ *   --limit=N           Limit number of contacts to import (default: 10, or 1000 with --sync)
+ *
+ * Examples:
+ *   npm run import:pipedrive --dry-run              # Preview first 10 contacts
+ *   npm run import:pipedrive --sync                 # Import only new contacts (up to 1000)
+ *   npm run import:pipedrive --sync --limit=5000    # Import only new contacts (up to 5000)
+ *   npm run import:pipedrive --limit=50             # Import first 50 contacts (including existing)
+ *
+ * Environment variables required:
+ *   PIPEDRIVE_API_KEY    - Your Pipedrive API token
+ *   PIPEDRIVE_DOMAIN     - Your Pipedrive domain (e.g., company.pipedrive.com)
+ */
+
 import { PrismaClient } from '@prisma/client'
 import { calculateNextReminderDate } from '../lib/cadence'
 
@@ -8,8 +32,9 @@ const prisma = new PrismaClient()
 // CLI Arguments
 const args = process.argv.slice(2)
 const dryRun = args.includes('--dry-run')
+const syncOnly = args.includes('--sync')
 const limitArg = args.find(arg => arg.startsWith('--limit='))
-const limit = limitArg ? parseInt(limitArg.split('=')[1]) : 10
+const limit = limitArg ? parseInt(limitArg.split('=')[1]) : (syncOnly ? 1000 : 10)
 
 // Environment variables
 const PIPEDRIVE_API_KEY = process.env.PIPEDRIVE_API_KEY
@@ -469,7 +494,7 @@ async function createInteraction(
 
 // Main function
 async function main() {
-  log('🚀', `Starting Pipedrive import (limit: ${limit}, dry-run: ${dryRun})`)
+  log('🚀', `Starting Pipedrive import (limit: ${limit}, dry-run: ${dryRun}, sync-only: ${syncOnly})`)
   log('', '')
 
   const stats: Stats = {
@@ -484,14 +509,39 @@ async function main() {
     // Step 0: Sync Labels
     await syncLabels(stats)
 
+    // If sync mode, get existing CRM IDs to filter out
+    let existingCrmIds = new Set<string>()
+    if (syncOnly) {
+      log('🔍', 'Fetching existing contacts from database...')
+      const existingContacts = await prisma.contact.findMany({
+        where: { crmId: { not: null } },
+        select: { crmId: true }
+      })
+      existingCrmIds = new Set(existingContacts.map(c => c.crmId).filter(Boolean) as string[])
+      log('✓', `Found ${existingCrmIds.size} existing contacts in database`)
+      log('', '')
+    }
+
     // Fetch persons from Pipedrive
     log('📥', `Fetching ${limit} persons from Pipedrive...`)
     const persons: PipedrivePerson[] = await fetchPipedrive(`/persons?limit=${limit}`)
     log('✓', `Fetched ${persons.length} persons`)
     log('', '')
 
+    // Filter out existing contacts if in sync mode
+    const personsToProcess = syncOnly
+      ? persons.filter(p => !existingCrmIds.has(String(p.id)))
+      : persons
+
+    if (syncOnly && personsToProcess.length < persons.length) {
+      const skipped = persons.length - personsToProcess.length
+      log('⏭️ ', `Skipping ${skipped} contacts already in database`)
+      log('✓', `${personsToProcess.length} new contacts to import`)
+      log('', '')
+    }
+
     // Process each person
-    for (const person of persons) {
+    for (const person of personsToProcess) {
       log('👤', `Processing: ${person.name}`)
 
       // Step 1: Create Team Member
@@ -544,6 +594,11 @@ async function main() {
       log('', '')
       log('💡', 'This was a dry run. No data was actually created.')
       log('💡', 'Run without --dry-run to import for real.')
+    }
+
+    if (syncOnly) {
+      log('', '')
+      log('💡', 'Sync mode: Only new contacts were imported.')
     }
 
   } catch (error) {
