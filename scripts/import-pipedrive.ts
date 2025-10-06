@@ -3,7 +3,7 @@
 /**
  * Pipedrive Import Script
  *
- * Imports contacts, companies, team members, labels, and interactions from Pipedrive CRM.
+ * Imports contacts, companies, team members, labels, interactions, and notes from Pipedrive CRM.
  * Supports pagination to fetch all contacts from Pipedrive (up to your specified limit).
  *
  * Usage:
@@ -12,13 +12,16 @@
  * Options:
  *   --dry-run           Preview what would be imported without creating records
  *   --sync              Only import contacts not already in the database (default limit: 1000)
- *   --limit=N           Limit number of contacts to import (default: 10, or 1000 with --sync)
+ *   --notes-only        Only import notes for existing contacts (default limit: 1000)
+ *   --limit=N           Limit number of contacts to import (default: 10, or 1000 with --sync/--notes-only)
  *
  * Examples:
  *   npm run import:pipedrive --dry-run              # Preview first 10 contacts
  *   npm run import:pipedrive --sync                 # Import only new contacts (up to 1000)
  *   npm run import:pipedrive --sync --limit=5000    # Import only new contacts (up to 5000, paginated)
  *   npm run import:pipedrive --limit=50             # Import first 50 contacts (including existing)
+ *   npm run import:pipedrive --notes-only           # Import notes for existing contacts (up to 1000)
+ *   npm run import:pipedrive --notes-only --dry-run # Preview notes import for existing contacts
  *
  * Pagination:
  *   The script automatically fetches contacts in batches of 500 (Pipedrive's max per request).
@@ -41,8 +44,9 @@ const prisma = new PrismaClient()
 const args = process.argv.slice(2)
 const dryRun = args.includes('--dry-run')
 const syncOnly = args.includes('--sync')
+const notesOnly = args.includes('--notes-only')
 const limitArg = args.find(arg => arg.startsWith('--limit='))
-const limit = limitArg ? parseInt(limitArg.split('=')[1]) : (syncOnly ? 1000 : 10)
+const limit = limitArg ? parseInt(limitArg.split('=')[1]) : (syncOnly || notesOnly ? 1000 : 10)
 
 // Environment variables
 const PIPEDRIVE_API_KEY = process.env.PIPEDRIVE_API_KEY
@@ -104,12 +108,23 @@ interface PipedriveLabel {
   color: string
 }
 
+interface PipedriveNote {
+  id: number
+  content: string
+  add_time: string
+  update_time: string
+  person_id: number
+  user_id: number
+  active_flag: boolean
+}
+
 interface Stats {
   labels: { created: number; skipped: number; errors: number }
   teamMembers: { created: number; skipped: number; errors: number }
   companies: { created: number; skipped: number; errors: number }
   contacts: { created: number; skipped: number; errors: number }
   interactions: { created: number; skipped: number; errors: number }
+  notes: { created: number; skipped: number; errors: number }
 }
 
 // Rate limiting state
@@ -605,9 +620,57 @@ async function createInteraction(
   }
 }
 
+// Step 5: Create Interactions from Notes
+async function createInteractionFromNote(
+  note: PipedriveNote,
+  contactId: string,
+  teamMemberId: string,
+  stats: Stats
+): Promise<void> {
+  try {
+    // Check if exists using pipedriveActivityId (we reuse this field for notes)
+    const existing = await prisma.interaction.findFirst({
+      where: { pipedriveNoteId: note.id }
+    })
+
+    if (existing) {
+      log('⏭️ ', `Note exists: (ID: ${note.id})`)
+      stats.notes.skipped++
+      return
+    }
+
+    // Strip HTML tags for preview
+    const contentPreview = note.content.replace(/<[^>]*>/g, '').substring(0, 50)
+    const interactionDate = parsePipedriveDate(note.add_time) || new Date()
+
+    if (dryRun) {
+      log('🔍', `[DRY RUN] Would create note: ${contentPreview}...`)
+      stats.notes.created++
+      return
+    }
+
+    await prisma.interaction.create({
+      data: {
+        contactId,
+        teamMemberId,
+        type: 'note',
+        content: note.content,
+        interactionDate,
+        pipedriveNoteId: note.id
+      }
+    })
+
+    log('✅', `Created note: ${contentPreview}...`)
+    stats.notes.created++
+  } catch (error) {
+    log('❌', `Error creating note ${note.id}: ${error}`)
+    stats.notes.errors++
+  }
+}
+
 // Main function
 async function main() {
-  log('🚀', `Starting Pipedrive import (limit: ${limit}, dry-run: ${dryRun}, sync-only: ${syncOnly})`)
+  log('🚀', `Starting Pipedrive import (limit: ${limit}, dry-run: ${dryRun}, sync-only: ${syncOnly}, notes-only: ${notesOnly})`)
   log('', '')
 
   const stats: Stats = {
@@ -615,13 +678,16 @@ async function main() {
     teamMembers: { created: 0, skipped: 0, errors: 0 },
     companies: { created: 0, skipped: 0, errors: 0 },
     contacts: { created: 0, skipped: 0, errors: 0 },
-    interactions: { created: 0, skipped: 0, errors: 0 }
+    interactions: { created: 0, skipped: 0, errors: 0 },
+    notes: { created: 0, skipped: 0, errors: 0 }
   }
 
   try {
-    // Step 0: Fetch custom field definitions and sync labels
-    await fetchCustomFieldDefinitions()
-    await syncLabels(stats)
+    // Step 0: Fetch custom field definitions and sync labels (skip in notes-only mode)
+    if (!notesOnly) {
+      await fetchCustomFieldDefinitions()
+      await syncLabels(stats)
+    }
 
     // If sync mode, get existing CRM IDs to filter out
     let existingCrmIds = new Set<string>()
@@ -636,22 +702,62 @@ async function main() {
       log('', '')
     }
 
+    // If notes-only mode, get existing contacts with their team members
+    let existingContactsMap = new Map<string, { id: string; teamMemberId: string | null }>()
+    if (notesOnly) {
+      log('🔍', 'Fetching existing contacts from database...')
+      const existingContacts = await prisma.contact.findMany({
+        where: { crmId: { not: null } },
+        select: {
+          id: true,
+          crmId: true,
+          teamMembers: {
+            select: { teamMemberId: true },
+            take: 1
+          }
+        }
+      })
+      existingContactsMap = new Map(
+        existingContacts
+          .filter(c => c.crmId)
+          .map(c => [
+            c.crmId as string,
+            { id: c.id, teamMemberId: c.teamMembers[0]?.teamMemberId || null }
+          ])
+      )
+      log('✓', `Found ${existingContactsMap.size} existing contacts in database`)
+      log('', '')
+    }
+
     // Fetch persons from Pipedrive with pagination
     log('📥', `Fetching up to ${limit} persons from Pipedrive...`)
     const persons: PipedrivePerson[] = await fetchAllPersons(limit)
     log('✓', `Fetched ${persons.length} persons total`)
     log('', '')
 
-    // Filter out existing contacts if in sync mode
-    const personsToProcess = syncOnly
-      ? persons.filter(p => !existingCrmIds.has(String(p.id)))
-      : persons
-
-    if (syncOnly && personsToProcess.length < persons.length) {
-      const skipped = persons.length - personsToProcess.length
-      log('⏭️ ', `Skipping ${skipped} contacts already in database`)
-      log('✓', `${personsToProcess.length} new contacts to import`)
-      log('', '')
+    // Filter contacts based on mode
+    let personsToProcess: PipedrivePerson[]
+    if (syncOnly) {
+      // Sync mode: only new contacts
+      personsToProcess = persons.filter(p => !existingCrmIds.has(String(p.id)))
+      if (personsToProcess.length < persons.length) {
+        const skipped = persons.length - personsToProcess.length
+        log('⏭️ ', `Skipping ${skipped} contacts already in database`)
+        log('✓', `${personsToProcess.length} new contacts to import`)
+        log('', '')
+      }
+    } else if (notesOnly) {
+      // Notes-only mode: only existing contacts
+      personsToProcess = persons.filter(p => existingContactsMap.has(String(p.id)))
+      if (personsToProcess.length < persons.length) {
+        const skipped = persons.length - personsToProcess.length
+        log('⏭️ ', `Skipping ${skipped} contacts not in database`)
+        log('✓', `${personsToProcess.length} existing contacts to process for notes`)
+        log('', '')
+      }
+    } else {
+      // Normal mode: all contacts
+      personsToProcess = persons
     }
 
     // Process each person
@@ -661,26 +767,45 @@ async function main() {
 
       log('👤', `${progress} Processing: ${person.name} (Pipedrive ID: ${person.id})`)
 
-      // Step 1: Create Team Member
+      let contactId: string | null = null
       let teamMemberId: string | null = null
-      if (person.owner_id) {
-        teamMemberId = await createTeamMember(person.owner_id, stats)
-      }
+      let wasCreated = false
 
-      // Step 2: Create Company
-      let companyId: string | null = null
-      if (person.org_id) {
-        companyId = await createCompany(person.org_id, stats)
-      }
+      if (notesOnly) {
+        // Notes-only mode: use existing contact info
+        const existingContact = existingContactsMap.get(String(person.id))
+        if (existingContact) {
+          contactId = existingContact.id
+          teamMemberId = existingContact.teamMemberId
+          log('✓', `  Using existing contact (ID: ${contactId})`)
+        } else {
+          log('⏭️ ', `  Contact not found in database, skipping`)
+          continue
+        }
+      } else {
+        // Normal/sync mode: create or update contacts
+        // Step 1: Create Team Member
+        if (person.owner_id) {
+          teamMemberId = await createTeamMember(person.owner_id, stats)
+        }
 
-      // Step 3: Create Contact
-      const result = await createContact(person, teamMemberId, companyId, stats, syncOnly)
-      const { contactId, wasCreated } = result
+        // Step 2: Create Company
+        let companyId: string | null = null
+        if (person.org_id) {
+          companyId = await createCompany(person.org_id, stats)
+        }
+
+        // Step 3: Create Contact
+        const result = await createContact(person, teamMemberId, companyId, stats, syncOnly)
+        contactId = result.contactId
+        wasCreated = result.wasCreated
+      }
 
       // Step 4: Fetch and create activities
       // In sync mode, only fetch activities for newly created contacts
+      // In notes-only mode, skip activities
       const shouldFetchActivities = contactId && contactId !== 'dry-run-id' && teamMemberId && teamMemberId !== 'dry-run-id'
-      const shouldProcessActivities = shouldFetchActivities && (!syncOnly || wasCreated)
+      const shouldProcessActivities = !notesOnly && shouldFetchActivities && (!syncOnly || wasCreated)
 
       if (shouldProcessActivities) {
         try {
@@ -699,6 +824,31 @@ async function main() {
         }
       }
 
+      // Step 5: Fetch and create notes
+      // In sync mode, only fetch notes for newly created contacts
+      // In notes-only mode, always fetch notes for existing contacts
+      const shouldProcessNotes = shouldFetchActivities && (notesOnly || !syncOnly || wasCreated)
+
+      if (shouldProcessNotes) {
+        try {
+          const response = await fetchPipedrive(`/notes?person_id=${person.id}`)
+          const notes: PipedriveNote[] = response.data || []
+
+          // Filter only active notes
+          const activeNotes = notes.filter(n => n.active_flag)
+
+          if (activeNotes && activeNotes.length > 0) {
+            log('📄', `  Found ${activeNotes.length} notes`)
+
+            for (const note of activeNotes) {
+              await createInteractionFromNote(note, contactId as string, teamMemberId as string, stats)
+            }
+          }
+        } catch (error) {
+          log('⚠️ ', `  Could not fetch notes: ${error}`)
+        }
+      }
+
       log('', '')
     }
 
@@ -711,6 +861,7 @@ async function main() {
     log('🏢', `Companies: ${stats.companies.created} created, ${stats.companies.skipped} skipped, ${stats.companies.errors} errors`)
     log('👤', `Contacts: ${stats.contacts.created} created, ${stats.contacts.skipped} skipped, ${stats.contacts.errors} errors`)
     log('📝', `Interactions: ${stats.interactions.created} created, ${stats.interactions.skipped} skipped, ${stats.interactions.errors} errors`)
+    log('📄', `Notes: ${stats.notes.created} created, ${stats.notes.skipped} skipped, ${stats.notes.errors} errors`)
     log('', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
     if (dryRun) {

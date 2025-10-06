@@ -133,6 +133,7 @@ model Interaction {
   content             String     @db.Text
   interactionDate     DateTime   @default(now())
   pipedriveActivityId Int?
+  pipedriveNoteId     Int?
   customFields        Json?
 
   contact             Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
@@ -143,6 +144,7 @@ model Interaction {
 
   @@index([contactId, interactionDate])
   @@index([pipedriveActivityId])
+  @@index([pipedriveNoteId])
   @@map("interactions")
 }
 
