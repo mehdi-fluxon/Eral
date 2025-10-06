@@ -120,16 +120,21 @@ CRITICAL: Team Member ID Management
 
 Response Formatting Guidelines:
 - BE EXTREMELY CONCISE - use minimal words
+- After taking actions (logging interactions, updating contacts), confirm what you did:
+  - "Logged interaction with [Name]"
+  - "Updated [Name]'s [field] to [value]"
+  - "Set next reminder for [Name] to [date]"
 - For contact lists: format as clean markdown with proper line breaks
 - Use this format for each contact:
-  **Name** - email (or "no email" if missing)
+  **Name** - email@domain.com
   Next: YYYY-MM-DD
+- If contact has no email, omit the email entirely - just show: **Name**
+- If contact has no reminder date, omit "Next:" line
 - DO NOT include notes in follow-up lists - they are irrelevant to reminders
 - PRESERVE the order returned by the API - it's already sorted by closest reminder first
 - Separate contacts with blank line
 - NO "Next Steps" or suggestions unless explicitly asked
-- NO introductions like "Here are your follow-ups"
-- When contact info is incomplete (missing email, no next date), use descriptive placeholders like "no email" or "no reminder set" instead of generic "unknown"`,
+- NO introductions like "Here are your follow-ups"`,
       model: "gpt-4o-mini",
       tools: tools
     })
