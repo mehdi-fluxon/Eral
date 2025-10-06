@@ -95,6 +95,7 @@ interface PipedrivePerson {
 interface PipedriveActivity {
   id: number
   type: string
+  subject: string | null
   note: string | null
   done: boolean
   due_date: string
@@ -596,7 +597,7 @@ async function createInteraction(
     const interactionDate = parsePipedriveDate(activity.due_date) || new Date()
 
     if (dryRun) {
-      log('🔍', `[DRY RUN] Would create interaction: ${activity.type}`)
+      log('🔍', `[DRY RUN] Would create interaction: ${activity.subject || activity.type}`)
       stats.interactions.created++
       return
     }
@@ -606,13 +607,14 @@ async function createInteraction(
         contactId,
         teamMemberId,
         type: activity.type,
+        subject: activity.subject,
         content,
         interactionDate,
         pipedriveActivityId: activity.id
       }
     })
 
-    log('✅', `Created interaction: ${activity.type}`)
+    log('✅', `Created interaction: ${activity.subject || activity.type}`)
     stats.interactions.created++
   } catch (error) {
     log('❌', `Error creating interaction ${activity.id}: ${error}`)
