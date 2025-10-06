@@ -35,9 +35,9 @@ Your response should help the router agent decide next steps.`,
       description: 'Search for contacts by name, email, job title, company, or team member',
       parameters: z.object({
         search: z.string().describe('Search term for name, email, job title, etc'),
-        teamMember: z.string().optional().describe('Filter by team member ID'),
-        company: z.string().optional().describe('Filter by company ID'),
-        label: z.string().optional().describe('Filter by label ID'),
+        teamMember: z.string().nullable().optional().describe('Filter by team member ID'),
+        company: z.string().nullable().optional().describe('Filter by company ID'),
+        label: z.string().nullable().optional().describe('Filter by label ID'),
         limit: z.number().default(100).describe('Max results to return')
       }),
       execute: async (args: any) => executeFunction('search_contacts', args)

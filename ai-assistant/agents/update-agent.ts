@@ -45,17 +45,17 @@ Context you'll receive:
       description: 'Update specific contact fields - ONLY include fields user wants to change',
       parameters: z.object({
         id: z.string().describe('Contact ID'),
-        name: z.string().optional().describe('Full name'),
-        firstName: z.string().optional().describe('First name'),
-        lastName: z.string().optional().describe('Last name'),
-        email: z.string().email().optional().describe('Email address'),
-        jobTitle: z.string().optional().describe('Job title'),
-        linkedinUrl: z.string().optional().describe('LinkedIn profile URL'),
-        referrer: z.string().optional().describe('Who referred this contact'),
-        companyIds: z.array(z.string()).optional().describe('Array of company IDs to associate - only include if explicitly changing companies'),
-        teamMemberIds: z.array(z.string()).optional().describe('Array of team member IDs to associate - only include if explicitly changing team members'),
-        cadence: z.enum(['1_DAY', '2_DAYS', '3_DAYS', '5_DAYS', '7_DAYS', '2_WEEKS', '3_WEEKS', '1_MONTH', '2_MONTHS', '3_MONTHS', '6_MONTHS', '9_MONTHS', '12_MONTHS', '18_MONTHS', '24_MONTHS']).optional().describe('Follow-up cadence'),
-        generalNotes: z.string().optional().describe('General notes about the contact')
+        name: z.string().nullable().optional().describe('Full name'),
+        firstName: z.string().nullable().optional().describe('First name'),
+        lastName: z.string().nullable().optional().describe('Last name'),
+        email: z.string().email().nullable().optional().describe('Email address'),
+        jobTitle: z.string().nullable().optional().describe('Job title'),
+        linkedinUrl: z.string().nullable().optional().describe('LinkedIn profile URL'),
+        referrer: z.string().nullable().optional().describe('Who referred this contact'),
+        companyIds: z.array(z.string()).nullable().optional().describe('Array of company IDs to associate - only include if explicitly changing companies'),
+        teamMemberIds: z.array(z.string()).nullable().optional().describe('Array of team member IDs to associate - only include if explicitly changing team members'),
+        cadence: z.enum(['1_DAY', '2_DAYS', '3_DAYS', '5_DAYS', '7_DAYS', '2_WEEKS', '3_WEEKS', '1_MONTH', '2_MONTHS', '3_MONTHS', '6_MONTHS', '9_MONTHS', '12_MONTHS', '18_MONTHS', '24_MONTHS']).nullable().optional().describe('Follow-up cadence'),
+        generalNotes: z.string().nullable().optional().describe('General notes about the contact')
       }),
       execute: async (args: any) => executeFunction('update_contact', args)
     })

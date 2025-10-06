@@ -45,15 +45,15 @@ Context you'll receive:
       name: 'search_contacts',
       description: 'Search and filter contacts with various criteria',
       parameters: z.object({
-        search: z.string().optional().describe('Free-text search across name, email, job title'),
-        startDate: z.string().optional().describe('Filter contacts with nextReminderDate >= this date (YYYY-MM-DD)'),
-        endDate: z.string().optional().describe('Filter contacts with nextReminderDate <= this date (YYYY-MM-DD)'),
-        reminderStatus: z.enum(['OVERDUE', 'DUE_TODAY', 'DUE_THIS_WEEK', 'UPCOMING', 'NO_REMINDER']).optional().describe('Preset reminder status filter'),
-        teamMember: z.string().optional().describe('Filter by team member ID'),
-        company: z.string().optional().describe('Filter by company ID'),
-        label: z.string().optional().describe('Filter by label ID'),
-        cadence: z.string().optional().describe('Filter by cadence value'),
-        page: z.number().optional().describe('Page number for pagination'),
+        search: z.string().nullable().optional().describe('Free-text search across name, email, job title'),
+        startDate: z.string().nullable().optional().describe('Filter contacts with nextReminderDate >= this date (YYYY-MM-DD)'),
+        endDate: z.string().nullable().optional().describe('Filter contacts with nextReminderDate <= this date (YYYY-MM-DD)'),
+        reminderStatus: z.enum(['OVERDUE', 'DUE_TODAY', 'DUE_THIS_WEEK', 'UPCOMING', 'NO_REMINDER']).nullable().optional().describe('Preset reminder status filter'),
+        teamMember: z.string().nullable().optional().describe('Filter by team member ID'),
+        company: z.string().nullable().optional().describe('Filter by company ID'),
+        label: z.string().nullable().optional().describe('Filter by label ID'),
+        cadence: z.string().nullable().optional().describe('Filter by cadence value'),
+        page: z.number().nullable().optional().describe('Page number for pagination'),
         limit: z.number().default(100).describe('Results per page')
       }),
       execute: async (args: any) => executeFunction('search_contacts', args)
@@ -63,7 +63,7 @@ Context you'll receive:
       name: 'get_dashboard_stats',
       description: 'Get dashboard statistics (total contacts, overdue, due this week, etc.)',
       parameters: z.object({
-        teamMember: z.string().optional().describe('Filter stats by team member ID')
+        teamMember: z.string().nullable().optional().describe('Filter stats by team member ID')
       }),
       execute: async (args: any) => executeFunction('get_dashboard_stats', args)
     }),

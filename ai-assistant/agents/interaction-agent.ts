@@ -38,9 +38,9 @@ Context you'll receive:
       parameters: z.object({
         contactId: z.string().describe('Contact ID - must be exactly one contact'),
         type: z.enum(['EMAIL', 'CALL', 'MEETING', 'LINKEDIN', 'FOLLOWUP', 'PROPOSAL', 'OTHER']).describe('Type of interaction'),
-        subject: z.string().optional().describe('Subject line or title of interaction'),
+        subject: z.string().nullable().optional().describe('Subject line or title of interaction'),
         content: z.string().describe('Details of what was discussed or communicated'),
-        interactionDate: z.string().optional().describe('Date of interaction in YYYY-MM-DD format, defaults to today if not provided'),
+        interactionDate: z.string().nullable().optional().describe('Date of interaction in YYYY-MM-DD format, defaults to today if not provided'),
         teamMemberId: z.string().describe('ID of team member logging this interaction'),
         updateLastTouch: z.boolean().default(true).describe('Whether to update contact last touch date - should always be true for past interactions')
       }),
@@ -54,7 +54,7 @@ Context you'll receive:
         contactId: z.string().describe('Contact ID'),
         content: z.string().describe('Note content'),
         teamMemberId: z.string().describe('ID of team member creating the note'),
-        noteDate: z.string().optional().describe('Note date in YYYY-MM-DD format, defaults to today')
+        noteDate: z.string().nullable().optional().describe('Note date in YYYY-MM-DD format, defaults to today')
       }),
       execute: async (args: any) => executeFunction('add_note_to_contact', args)
     })
