@@ -327,7 +327,7 @@ export function generateAgentTools() {
 
     tool({
       name: "update_contact",
-      description: "Update contact information and associations. CRITICAL: Only include fields you want to change. DO NOT pass companyIds, teamMemberIds, or labelIds unless you explicitly want to change those relationships. Omitting these fields will preserve existing relationships.",
+      description: "Update contact information and associations. CRITICAL: ONLY include the specific field(s) the user wants to change - DO NOT pass any other fields even if you know their values. For example, if user says 'update john's title to CEO', ONLY pass id and jobTitle - nothing else. DO NOT pass companyIds, teamMemberIds, or labelIds unless explicitly changing those relationships.",
       parameters: z.object({
         id: z.string().describe("Contact ID"),
         name: z.string().nullable().optional().describe("Contact full name"),

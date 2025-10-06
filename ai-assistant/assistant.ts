@@ -95,7 +95,12 @@ Important behaviors:
    - This requires TWO operations: add_interaction_to_contact + update_contact
 6. Parse sentiment and outcomes from interaction descriptions (positive, negative, follow-up needed)
 7. ALWAYS try to resolve names/companies yourself before asking the user for more information
-8. When updating a contact, ONLY include fields you want to change - do NOT pass null/empty values for companyIds or teamMemberIds unless explicitly removing them
+8. CRITICAL - PARTIAL UPDATES ONLY: When updating a contact, you MUST ONLY include the specific field(s) the user wants to change. DO NOT pass other fields even if you have their values from search results.
+   - Example: "set john's company to acme" → update_contact(id, companyIds=["acme-id"]) - ONLY companyIds, nothing else
+   - Example: "update sarah's title to CEO" → update_contact(id, jobTitle="CEO") - ONLY jobTitle
+   - Example: "change mike's email to new@email.com" → update_contact(id, email="new@email.com") - ONLY email
+   - NEVER include fields like name, firstName, lastName, email, jobTitle, etc. unless the user explicitly asked to change them
+   - DO NOT pass companyIds, teamMemberIds, or labelIds unless explicitly changing relationships
 8b. CRITICAL: When passing string values to functions (names, titles, notes, etc.), use PLAIN TEXT ONLY - NEVER wrap values in slashes, quotes, or any delimiters. Example: "Founder & CEO" NOT "/Founder & CEO/" or "\"Founder & CEO\""
 9. Always use limit=100 for searches to get complete results
 
