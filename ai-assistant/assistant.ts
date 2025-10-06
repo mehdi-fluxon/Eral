@@ -133,7 +133,7 @@ Response Formatting Guidelines:
       let contextualMessage = `[Context: Today's date is ${currentDate}.`
 
       if (teamMemberId) {
-        contextualMessage += ` The current user's team member ID is "${teamMemberId}". Use this ID when creating new contacts, interactions, or notes. When searching contacts, search ALL contacts across all team members unless the user specifically asks to filter by a team member.`
+        contextualMessage += ` The current user's team member ID is "${teamMemberId}". Use this ID when creating new contacts, interactions, or notes. When the user asks about "my" contacts/followups/reminders, ALWAYS filter by teamMember="${teamMemberId}". When searching all contacts (without "my"), search across all team members.`
       }
 
       contextualMessage += `]\n\n${userMessage}`
