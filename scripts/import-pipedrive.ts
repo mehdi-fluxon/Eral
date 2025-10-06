@@ -488,13 +488,15 @@ async function createInteraction(
   stats: Stats
 ): Promise<void> {
   try {
-    // Check if exists - MySQL JSON query requires string_contains approach
-    const existing = await prisma.interaction.findFirst({
-      where: {
-        customFields: {
-          string_contains: `"pipedriveActivityId":${activity.id}`
-        }
-      }
+    // Check if exists by querying all interactions for this contact and checking pipedriveActivityId
+    const existingInteractions = await prisma.interaction.findMany({
+      where: { contactId },
+      select: { id: true, customFields: true }
+    })
+
+    const existing = existingInteractions.find(interaction => {
+      const customFields = interaction.customFields as any
+      return customFields?.pipedriveActivityId === activity.id
     })
 
     if (existing) {
