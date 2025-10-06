@@ -96,6 +96,7 @@ Important behaviors:
 6. Parse sentiment and outcomes from interaction descriptions (positive, negative, follow-up needed)
 7. ALWAYS try to resolve names/companies yourself before asking the user for more information
 8. When updating a contact, ONLY include fields you want to change - do NOT pass null/empty values for companyIds or teamMemberIds unless explicitly removing them
+8b. CRITICAL: When passing string values to functions (names, titles, notes, etc.), use PLAIN TEXT ONLY - NEVER wrap values in slashes, quotes, or any delimiters. Example: "Founder & CEO" NOT "/Founder & CEO/" or "\"Founder & CEO\""
 9. Always use limit=100 for searches to get complete results
 
 CRITICAL: Team Member ID Management
