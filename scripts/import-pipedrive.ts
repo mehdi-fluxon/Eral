@@ -10,20 +10,24 @@
  *   npm run import:pipedrive [options]
  *
  * Options:
- *   --dry-run           Preview what would be imported without creating records
- *   --sync              Only import contacts not already in the database (default limit: 1000)
- *   --notes-only        Only import notes for existing contacts (default limit: 1000)
- *   --contact-id=N      Update/import a single contact by Pipedrive CRM ID (overwrites existing data)
- *   --limit=N           Limit number of contacts to import (default: 10, or 1000 with --sync/--notes-only)
+ *   --dry-run              Preview what would be imported without creating records
+ *   --sync                 Only import contacts not already in the database (default limit: 1000)
+ *   --notes-only           Only import notes for existing contacts (default limit: 1000)
+ *   --update-interactions  Update/sync interactions (activities & notes) for existing contacts (default limit: 1000)
+ *   --contact-id=N         Update/import a single contact by Pipedrive CRM ID (overwrites existing data)
+ *   --limit=N              Limit number of contacts to import (default: 10, or 1000 with --sync/--notes-only/--update-interactions)
  *
  * Examples:
- *   npm run import:pipedrive --dry-run              # Preview first 10 contacts
- *   npm run import:pipedrive --sync                 # Import only new contacts (up to 1000)
- *   npm run import:pipedrive --sync --limit=5000    # Import only new contacts (up to 5000, paginated)
- *   npm run import:pipedrive --limit=50             # Import first 50 contacts (including existing)
- *   npm run import:pipedrive --notes-only           # Import notes for existing contacts (up to 1000)
- *   npm run import:pipedrive --notes-only --dry-run # Preview notes import for existing contacts
- *   npm run import:pipedrive --contact-id=12345     # Update single contact with Pipedrive ID 12345
+ *   npm run import:pipedrive --dry-run                      # Preview first 10 contacts
+ *   npm run import:pipedrive --sync                         # Import only new contacts (up to 1000)
+ *   npm run import:pipedrive --sync --limit=5000            # Import only new contacts (up to 5000, paginated)
+ *   npm run import:pipedrive --limit=50                     # Import first 50 contacts (including existing)
+ *   npm run import:pipedrive --notes-only                   # Import notes for existing contacts (up to 1000)
+ *   npm run import:pipedrive --notes-only --dry-run         # Preview notes import for existing contacts
+ *   npm run import:pipedrive --update-interactions          # Update interactions for existing contacts (up to 1000)
+ *   npm run import:pipedrive --update-interactions --limit=50  # Update interactions for 50 contacts
+ *   npm run import:pipedrive --update-interactions --dry-run   # Preview interaction updates
+ *   npm run import:pipedrive --contact-id=12345             # Update single contact with Pipedrive ID 12345
  *
  * Pagination:
  *   The script automatically fetches contacts in batches of 500 (Pipedrive's max per request).
@@ -47,10 +51,11 @@ const args = process.argv.slice(2)
 const dryRun = args.includes('--dry-run')
 const syncOnly = args.includes('--sync')
 const notesOnly = args.includes('--notes-only')
+const updateInteractions = args.includes('--update-interactions')
 const contactIdArg = args.find(arg => arg.startsWith('--contact-id='))
 const singleContactId = contactIdArg ? parseInt(contactIdArg.split('=')[1]) : null
 const limitArg = args.find(arg => arg.startsWith('--limit='))
-const limit = limitArg ? parseInt(limitArg.split('=')[1]) : (syncOnly || notesOnly ? 1000 : 10)
+const limit = limitArg ? parseInt(limitArg.split('=')[1]) : (syncOnly || notesOnly || updateInteractions ? 1000 : 10)
 
 // Environment variables
 const PIPEDRIVE_API_KEY = process.env.PIPEDRIVE_API_KEY
@@ -128,8 +133,8 @@ interface Stats {
   teamMembers: { created: number; skipped: number; errors: number }
   companies: { created: number; skipped: number; errors: number }
   contacts: { created: number; skipped: number; errors: number }
-  interactions: { created: number; skipped: number; errors: number }
-  notes: { created: number; skipped: number; errors: number }
+  interactions: { created: number; updated: number; skipped: number; errors: number }
+  notes: { created: number; updated: number; skipped: number; errors: number }
 }
 
 // Rate limiting state
@@ -701,12 +706,13 @@ async function createContact(
   }
 }
 
-// Step 4: Create Interactions
-async function createInteraction(
+// Step 4: Create or Update Interactions
+async function upsertInteraction(
   activity: PipedriveActivity,
   contactId: string,
   teamMemberId: string,
-  stats: Stats
+  stats: Stats,
+  shouldUpdate: boolean = false
 ): Promise<void> {
   try {
     // Check if exists using the dedicated pipedriveActivityId field
@@ -714,16 +720,40 @@ async function createInteraction(
       where: { pipedriveActivityId: activity.id }
     })
 
-    if (existing) {
-      log('⏭️ ', `Interaction exists: ${activity.type} (ID: ${activity.id})`)
-      stats.interactions.skipped++
-      return
-    }
-
     // Build content from note or default to activity type
     const content = activity.note || `${activity.type} activity`
     const interactionDate = parsePipedriveDate(activity.due_date) || new Date()
 
+    if (existing) {
+      if (!shouldUpdate) {
+        log('⏭️ ', `Interaction exists: ${activity.type} (ID: ${activity.id})`)
+        stats.interactions.skipped++
+        return
+      }
+
+      // Update mode
+      if (dryRun) {
+        log('🔍', `[DRY RUN] Would update interaction: ${activity.subject || activity.type}`)
+        stats.interactions.updated++
+        return
+      }
+
+      await prisma.interaction.update({
+        where: { id: existing.id },
+        data: {
+          type: activity.type,
+          subject: activity.subject,
+          content,
+          interactionDate
+        }
+      })
+
+      log('✅', `Updated interaction: ${activity.subject || activity.type}`)
+      stats.interactions.updated++
+      return
+    }
+
+    // Create new interaction
     if (dryRun) {
       log('🔍', `[DRY RUN] Would create interaction: ${activity.subject || activity.type}`)
       stats.interactions.created++
@@ -745,34 +775,57 @@ async function createInteraction(
     log('✅', `Created interaction: ${activity.subject || activity.type}`)
     stats.interactions.created++
   } catch (error) {
-    log('❌', `Error creating interaction ${activity.id}: ${error}`)
+    log('❌', `Error upserting interaction ${activity.id}: ${error}`)
     stats.interactions.errors++
   }
 }
 
-// Step 5: Create Interactions from Notes
-async function createInteractionFromNote(
+// Step 5: Create or Update Interactions from Notes
+async function upsertInteractionFromNote(
   note: PipedriveNote,
   contactId: string,
   teamMemberId: string,
-  stats: Stats
+  stats: Stats,
+  shouldUpdate: boolean = false
 ): Promise<void> {
   try {
-    // Check if exists using pipedriveActivityId (we reuse this field for notes)
+    // Check if exists using pipedriveNoteId field
     const existing = await prisma.interaction.findFirst({
       where: { pipedriveNoteId: note.id }
     })
-
-    if (existing) {
-      log('⏭️ ', `Note exists: (ID: ${note.id})`)
-      stats.notes.skipped++
-      return
-    }
 
     // Strip HTML tags for preview
     const contentPreview = note.content.replace(/<[^>]*>/g, '').substring(0, 50)
     const interactionDate = parsePipedriveDate(note.add_time) || new Date()
 
+    if (existing) {
+      if (!shouldUpdate) {
+        log('⏭️ ', `Note exists: (ID: ${note.id})`)
+        stats.notes.skipped++
+        return
+      }
+
+      // Update mode
+      if (dryRun) {
+        log('🔍', `[DRY RUN] Would update note: ${contentPreview}...`)
+        stats.notes.updated++
+        return
+      }
+
+      await prisma.interaction.update({
+        where: { id: existing.id },
+        data: {
+          content: note.content,
+          interactionDate
+        }
+      })
+
+      log('✅', `Updated note: ${contentPreview}...`)
+      stats.notes.updated++
+      return
+    }
+
+    // Create new note
     if (dryRun) {
       log('🔍', `[DRY RUN] Would create note: ${contentPreview}...`)
       stats.notes.created++
@@ -793,14 +846,14 @@ async function createInteractionFromNote(
     log('✅', `Created note: ${contentPreview}...`)
     stats.notes.created++
   } catch (error) {
-    log('❌', `Error creating note ${note.id}: ${error}`)
+    log('❌', `Error upserting note ${note.id}: ${error}`)
     stats.notes.errors++
   }
 }
 
 // Main function
 async function main() {
-  log('🚀', `Starting Pipedrive import (limit: ${limit}, dry-run: ${dryRun}, sync-only: ${syncOnly}, notes-only: ${notesOnly}, contact-id: ${singleContactId || 'none'})`)
+  log('🚀', `Starting Pipedrive import (limit: ${limit}, dry-run: ${dryRun}, sync-only: ${syncOnly}, notes-only: ${notesOnly}, update-interactions: ${updateInteractions}, contact-id: ${singleContactId || 'none'})`)
   log('', '')
 
   const stats: Stats = {
@@ -808,8 +861,8 @@ async function main() {
     teamMembers: { created: 0, skipped: 0, errors: 0 },
     companies: { created: 0, skipped: 0, errors: 0 },
     contacts: { created: 0, skipped: 0, errors: 0 },
-    interactions: { created: 0, skipped: 0, errors: 0 },
-    notes: { created: 0, skipped: 0, errors: 0 }
+    interactions: { created: 0, updated: 0, skipped: 0, errors: 0 },
+    notes: { created: 0, updated: 0, skipped: 0, errors: 0 }
   }
 
   try {
@@ -867,7 +920,7 @@ async function main() {
             log('✓', `Found ${activities.length} activities`)
 
             for (const activity of activities) {
-              await createInteraction(activity, contactId, teamMemberId, stats)
+              await upsertInteraction(activity, contactId, teamMemberId, stats, true)
             }
           } else {
             log('ℹ️', 'No activities found')
@@ -889,7 +942,7 @@ async function main() {
             log('✓', `Found ${notes.length} notes`)
 
             for (const note of notes) {
-              await createInteractionFromNote(note, contactId, teamMemberId, stats)
+              await upsertInteractionFromNote(note, contactId, teamMemberId, stats, true)
             }
           } else {
             log('ℹ️', 'No notes found')
@@ -904,17 +957,22 @@ async function main() {
       log('', '')
       log('📊', 'Summary:')
       Object.entries(stats).forEach(([category, counts]) => {
-        const total = counts.created + counts.skipped + counts.errors
+        const hasUpdated = 'updated' in counts
+        const total = counts.created + counts.skipped + counts.errors + (hasUpdated ? counts.updated : 0)
         if (total > 0) {
-          log('  ', `${category}: ${counts.created} created, ${counts.skipped} skipped, ${counts.errors} errors`)
+          if (hasUpdated) {
+            log('  ', `${category}: ${counts.created} created, ${counts.updated} updated, ${counts.skipped} skipped, ${counts.errors} errors`)
+          } else {
+            log('  ', `${category}: ${counts.created} created, ${counts.skipped} skipped, ${counts.errors} errors`)
+          }
         }
       })
 
       return
     }
 
-    // Step 0: Fetch custom field definitions and sync labels (skip in notes-only mode)
-    if (!notesOnly) {
+    // Step 0: Fetch custom field definitions and sync labels (skip in notes-only and update-interactions modes)
+    if (!notesOnly && !updateInteractions) {
       await fetchCustomFieldDefinitions()
       await syncLabels(stats)
     }
@@ -932,9 +990,9 @@ async function main() {
       log('', '')
     }
 
-    // If notes-only mode, get existing contacts with their team members
+    // If notes-only or update-interactions mode, get existing contacts with their team members
     let existingContactsMap = new Map<string, { id: string; teamMemberId: string | null }>()
-    if (notesOnly) {
+    if (notesOnly || updateInteractions) {
       log('🔍', 'Fetching existing contacts from database...')
       const existingContacts = await prisma.contact.findMany({
         where: { crmId: { not: null } },
@@ -985,6 +1043,15 @@ async function main() {
         log('✓', `${personsToProcess.length} existing contacts to process for notes`)
         log('', '')
       }
+    } else if (updateInteractions) {
+      // Update-interactions mode: only existing contacts
+      personsToProcess = persons.filter(p => existingContactsMap.has(String(p.id)))
+      if (personsToProcess.length < persons.length) {
+        const skipped = persons.length - personsToProcess.length
+        log('⏭️ ', `Skipping ${skipped} contacts not in database`)
+        log('✓', `${personsToProcess.length} existing contacts to update interactions`)
+        log('', '')
+      }
     } else {
       // Normal mode: all contacts
       personsToProcess = persons
@@ -1001,8 +1068,8 @@ async function main() {
       let teamMemberId: string | null = null
       let wasCreated = false
 
-      if (notesOnly) {
-        // Notes-only mode: use existing contact info
+      if (notesOnly || updateInteractions) {
+        // Notes-only or update-interactions mode: use existing contact info
         const existingContact = existingContactsMap.get(String(person.id))
         if (existingContact) {
           contactId = existingContact.id
@@ -1031,11 +1098,12 @@ async function main() {
         wasCreated = result.wasCreated
       }
 
-      // Step 4: Fetch and create activities
+      // Step 4: Fetch and create/update activities
       // In sync mode, only fetch activities for newly created contacts
       // In notes-only mode, skip activities
+      // In update-interactions mode, always fetch activities for existing contacts
       const shouldFetchActivities = contactId && contactId !== 'dry-run-id' && teamMemberId && teamMemberId !== 'dry-run-id'
-      const shouldProcessActivities = !notesOnly && shouldFetchActivities && (!syncOnly || wasCreated)
+      const shouldProcessActivities = !notesOnly && shouldFetchActivities && (updateInteractions || !syncOnly || wasCreated)
 
       if (shouldProcessActivities) {
         try {
@@ -1046,7 +1114,7 @@ async function main() {
             log('📝', `  Found ${activities.length} activities`)
 
             for (const activity of activities) {
-              await createInteraction(activity, contactId as string, teamMemberId as string, stats)
+              await upsertInteraction(activity, contactId as string, teamMemberId as string, stats, updateInteractions)
             }
           }
         } catch (error) {
@@ -1054,10 +1122,11 @@ async function main() {
         }
       }
 
-      // Step 5: Fetch and create notes
+      // Step 5: Fetch and create/update notes
       // In sync mode, only fetch notes for newly created contacts
       // In notes-only mode, always fetch notes for existing contacts
-      const shouldProcessNotes = shouldFetchActivities && (notesOnly || !syncOnly || wasCreated)
+      // In update-interactions mode, always fetch notes for existing contacts
+      const shouldProcessNotes = shouldFetchActivities && (notesOnly || updateInteractions || !syncOnly || wasCreated)
 
       if (shouldProcessNotes) {
         try {
@@ -1071,7 +1140,7 @@ async function main() {
             log('📄', `  Found ${activeNotes.length} notes`)
 
             for (const note of activeNotes) {
-              await createInteractionFromNote(note, contactId as string, teamMemberId as string, stats)
+              await upsertInteractionFromNote(note, contactId as string, teamMemberId as string, stats, updateInteractions)
             }
           }
         } catch (error) {
@@ -1090,8 +1159,8 @@ async function main() {
     log('👥', `Team Members: ${stats.teamMembers.created} created, ${stats.teamMembers.skipped} skipped, ${stats.teamMembers.errors} errors`)
     log('🏢', `Companies: ${stats.companies.created} created, ${stats.companies.skipped} skipped, ${stats.companies.errors} errors`)
     log('👤', `Contacts: ${stats.contacts.created} created, ${stats.contacts.skipped} skipped, ${stats.contacts.errors} errors`)
-    log('📝', `Interactions: ${stats.interactions.created} created, ${stats.interactions.skipped} skipped, ${stats.interactions.errors} errors`)
-    log('📄', `Notes: ${stats.notes.created} created, ${stats.notes.skipped} skipped, ${stats.notes.errors} errors`)
+    log('📝', `Interactions: ${stats.interactions.created} created, ${stats.interactions.updated} updated, ${stats.interactions.skipped} skipped, ${stats.interactions.errors} errors`)
+    log('📄', `Notes: ${stats.notes.created} created, ${stats.notes.updated} updated, ${stats.notes.skipped} skipped, ${stats.notes.errors} errors`)
     log('', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
     if (dryRun) {
@@ -1103,6 +1172,11 @@ async function main() {
     if (syncOnly) {
       log('', '')
       log('💡', 'Sync mode: Only new contacts were imported.')
+    }
+
+    if (updateInteractions) {
+      log('', '')
+      log('💡', 'Update-interactions mode: Interactions were updated/synced for existing contacts.')
     }
 
   } catch (error) {
