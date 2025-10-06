@@ -26,9 +26,10 @@ export class SlackClient {
       const result = await executeFunction('search_team_members', { search: email })
       console.log('🔍 [Slack] API response:', JSON.stringify(result, null, 2))
 
-      if (result.teamMembers && result.teamMembers.length > 0) {
-        console.log('✅ [Slack] Found team members:', result.teamMembers.length)
-        return result.teamMembers[0].id
+      // API returns array directly, not wrapped in { teamMembers: [...] }
+      if (Array.isArray(result) && result.length > 0) {
+        console.log('✅ [Slack] Found team members:', result.length)
+        return result[0].id
       }
 
       console.log('❌ [Slack] No team members in API response')
