@@ -25,6 +25,7 @@ interface TimelineInteraction {
   id: string
   type: 'interaction'
   interactionType: string
+  subject?: string
   content: string
   teamMember: TeamMember
   date: string
@@ -245,6 +246,12 @@ export default function ActivityTimeline({ contactId, onActivityAdded }: Activit
                     <span className="text-sm text-gray-400">•</span>
                     <span className="text-sm text-gray-600">{item.teamMember.name}</span>
                   </div>
+
+                  {item.type === 'interaction' && item.subject && (
+                    <div className="font-semibold text-gray-900 text-sm mb-1">
+                      {item.subject}
+                    </div>
+                  )}
 
                   <div className="text-gray-700 text-sm space-y-1">
                     {renderContent(item.content)}

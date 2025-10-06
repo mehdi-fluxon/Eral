@@ -48,6 +48,7 @@ export async function GET(
       id: interaction.id,
       type: interaction.type === 'NOTE' ? 'note' : 'interaction',
       interactionType: interaction.type,
+      subject: interaction.subject,
       content: interaction.content,
       teamMember: interaction.teamMember,
       date: interaction.interactionDate,
