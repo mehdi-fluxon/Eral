@@ -120,6 +120,9 @@ Response Formatting Guidelines:
 
   async processMessage(userMessage: string, userId: string, teamMemberId?: string) {
     try {
+      console.log('🤖 [AI Agent] Processing message for user:', userId)
+      console.log('🤖 [AI Agent] Team Member ID:', teamMemberId || 'NOT PROVIDED')
+
       const agent = await this.createOrGetAgent()
 
       // Get previous conversation history
@@ -134,6 +137,8 @@ Response Formatting Guidelines:
       }
 
       contextualMessage += `]\n\n${userMessage}`
+
+      console.log('🤖 [AI Agent] Context message:', contextualMessage)
 
       // Build input: previous history + new message
       const input = previousHistory.length > 0

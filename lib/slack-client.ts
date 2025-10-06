@@ -34,18 +34,23 @@ export class SlackClient {
   }
 
   private async getTeamMemberIdForSlackUser(slackUserId: string): Promise<string | undefined> {
+    console.log('🔍 [Slack] Looking up team member for Slack user:', slackUserId)
+
     const email = await this.getSlackUserEmail(slackUserId)
     if (!email) {
-      console.log('Could not retrieve email for Slack user:', slackUserId)
+      console.log('❌ [Slack] Could not retrieve email for Slack user:', slackUserId)
       return undefined
     }
+
+    console.log('✅ [Slack] Found email for Slack user:', email)
 
     const teamMemberId = await this.getTeamMemberIdByEmail(email)
     if (!teamMemberId) {
-      console.log('No team member found for email:', email)
+      console.log('❌ [Slack] No team member found for email:', email)
       return undefined
     }
 
+    console.log('✅ [Slack] Found team member ID:', teamMemberId)
     return teamMemberId
   }
 
