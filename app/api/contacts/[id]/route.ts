@@ -199,23 +199,25 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updateData.nextReminderDate = nextReminder
     }
 
-    if (companyIds !== undefined) {
+    // Only update company relationships if companyIds is explicitly provided and is an array
+    if (companyIds !== undefined && Array.isArray(companyIds)) {
       await prisma.contactCompany.deleteMany({
         where: { contactId: id }
       })
-      if (companyIds && companyIds.length > 0) {
+      if (companyIds.length > 0) {
         updateData.companies = {
           create: companyIds.map((companyId: string) => ({ companyId }))
         }
       }
     }
 
-    if (teamMemberIds !== undefined) {
+    // Only update team member relationships if teamMemberIds is explicitly provided and is an array
+    if (teamMemberIds !== undefined && Array.isArray(teamMemberIds)) {
       await prisma.contactTeamMember.deleteMany({
         where: { contactId: id }
       })
 
-      if (teamMemberIds && teamMemberIds.length > 0) {
+      if (teamMemberIds.length > 0) {
         const validTeamMembers = await prisma.teamMember.findMany({
           where: { id: { in: teamMemberIds } }
         })
@@ -228,12 +230,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    if (labelIds !== undefined) {
+    // Only update label relationships if labelIds is explicitly provided and is an array
+    if (labelIds !== undefined && Array.isArray(labelIds)) {
       await prisma.contactLabel.deleteMany({
         where: { contactId: id }
       })
 
-      if (labelIds && labelIds.length > 0) {
+      if (labelIds.length > 0) {
         const validLabels = await prisma.label.findMany({
           where: { id: { in: labelIds } }
         })

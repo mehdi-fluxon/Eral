@@ -73,10 +73,24 @@ export async function executeFunction(functionName: string, parameters: any) {
 
       case 'update_contact': {
         const { id, ...updateData } = parameters
+
+        // Remove undefined/null values and empty arrays to avoid unintended deletions
+        const cleanedData = Object.entries(updateData).reduce((acc, [key, value]) => {
+          // Only include the field if it has a meaningful value
+          if (value !== undefined && value !== null) {
+            // For arrays (companyIds, teamMemberIds, labelIds), only include if non-empty
+            if (Array.isArray(value) && value.length === 0) {
+              return acc // Skip empty arrays
+            }
+            acc[key] = value
+          }
+          return acc
+        }, {} as Record<string, any>)
+
         const response = await fetch(`${baseUrl}/api/contacts/${id}`, {
           method: 'PUT',
           headers,
-          body: JSON.stringify(updateData)
+          body: JSON.stringify(cleanedData)
         })
         return await response.json()
       }
@@ -310,7 +324,7 @@ export function generateAgentTools() {
 
     tool({
       name: "update_contact",
-      description: "Update contact information and associations. IMPORTANT: Only include fields you want to change. Omit companyIds and teamMemberIds to preserve existing relationships.",
+      description: "Update contact information and associations. CRITICAL: Only include fields you want to change. DO NOT pass companyIds, teamMemberIds, or labelIds unless you explicitly want to change those relationships. Omitting these fields will preserve existing relationships.",
       parameters: z.object({
         id: z.string().describe("Contact ID"),
         name: z.string().nullable().optional().describe("Contact full name"),
