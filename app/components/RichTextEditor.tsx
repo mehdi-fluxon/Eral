@@ -38,7 +38,8 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none min-h-[200px] px-3 py-2'
       }
-    }
+    },
+    immediatelyRender: false
   })
 
   // Update editor content when prop changes
