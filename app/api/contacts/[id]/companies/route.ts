@@ -75,8 +75,9 @@ import prisma from '@/lib/prisma'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const { companyId } = await request.json()
 
@@ -86,7 +87,7 @@ export async function POST(
 
     // Check if contact exists
     const contact = await prisma.contact.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         companies: true
       }
@@ -111,7 +112,7 @@ export async function POST(
       return NextResponse.json({
         message: 'Company already associated with contact',
         contact: await prisma.contact.findUnique({
-          where: { id: params.id },
+          where: { id },
           include: {
             companies: {
               include: { company: true }
@@ -127,14 +128,14 @@ export async function POST(
     // Add new company association
     await prisma.contactCompany.create({
       data: {
-        contactId: params.id,
+        contactId: id,
         companyId: companyId
       }
     })
 
     // Return updated contact
     const updatedContact = await prisma.contact.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         companies: {
           include: { company: true }
@@ -157,8 +158,9 @@ export async function POST(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const { companyIds } = await request.json()
 
@@ -168,7 +170,7 @@ export async function PUT(
 
     // Check if contact exists
     const contact = await prisma.contact.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!contact) {
@@ -188,14 +190,14 @@ export async function PUT(
 
     // Delete existing associations
     await prisma.contactCompany.deleteMany({
-      where: { contactId: params.id }
+      where: { contactId: id }
     })
 
     // Create new associations
     if (companyIds.length > 0) {
       await prisma.contactCompany.createMany({
         data: companyIds.map((companyId: string) => ({
-          contactId: params.id,
+          contactId: id,
           companyId: companyId
         }))
       })
@@ -203,7 +205,7 @@ export async function PUT(
 
     // Return updated contact
     const updatedContact = await prisma.contact.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         companies: {
           include: { company: true }
