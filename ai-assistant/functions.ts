@@ -260,6 +260,114 @@ export async function executeFunction(functionName: string, parameters: any) {
         return await response.json()
       }
 
+      // ==================== REMINDERS ====================
+
+      case 'set_next_reminder': {
+        const { contactId, reminderDate } = parameters
+        const response = await fetch(`${baseUrl}/api/contacts/${contactId}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({ nextReminderDate: reminderDate })
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error || `Failed to set reminder: ${response.status}`)
+        }
+        return data
+      }
+
+      // ==================== COMPANY MANAGEMENT ====================
+
+      case 'add_company_to_contact': {
+        const { contactId, companyId } = parameters
+        const response = await fetch(`${baseUrl}/api/contacts/${contactId}/companies`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ companyId })
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error || `Failed to add company to contact: ${response.status}`)
+        }
+        return data
+      }
+
+      case 'update_contact_companies': {
+        const { contactId, companyIds } = parameters
+        const response = await fetch(`${baseUrl}/api/contacts/${contactId}/companies`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({ companyIds })
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error || `Failed to update contact companies: ${response.status}`)
+        }
+        return data
+      }
+
+      // ==================== UTILITIES ====================
+
+      case 'calculate_date_range': {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+
+        let startDate: Date
+        let endDate: Date
+
+        switch (parameters.range) {
+          case 'today':
+            startDate = new Date(today)
+            endDate = new Date(today)
+            endDate.setHours(23, 59, 59, 999)
+            break
+
+          case 'this_week':
+            startDate = new Date(today)
+            startDate.setDate(today.getDate() - today.getDay()) // Start of week (Sunday)
+            endDate = new Date(startDate)
+            endDate.setDate(startDate.getDate() + 6) // End of week (Saturday)
+            endDate.setHours(23, 59, 59, 999)
+            break
+
+          case 'next_week':
+            startDate = new Date(today)
+            startDate.setDate(today.getDate() - today.getDay() + 7) // Start of next week
+            endDate = new Date(startDate)
+            endDate.setDate(startDate.getDate() + 6) // End of next week
+            endDate.setHours(23, 59, 59, 999)
+            break
+
+          case 'this_month':
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1)
+            endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+            endDate.setHours(23, 59, 59, 999)
+            break
+
+          case 'next_month':
+            startDate = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+            endDate = new Date(today.getFullYear(), today.getMonth() + 2, 0)
+            endDate.setHours(23, 59, 59, 999)
+            break
+
+          case 'overdue':
+            startDate = new Date('1970-01-01')
+            endDate = new Date(today)
+            endDate.setDate(today.getDate() - 1) // Up to yesterday
+            endDate.setHours(23, 59, 59, 999)
+            break
+
+          default:
+            throw new Error(`Unknown date range: ${parameters.range}`)
+        }
+
+        return {
+          range: parameters.range,
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0]
+        }
+      }
+
       default:
         throw new Error(`Unknown function: ${functionName}`)
     }

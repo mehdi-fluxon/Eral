@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(git push:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(curl -s -H \"x-internal-api-key: $INTERNAL_API_KEY\" http://localhost:3000/api/contacts/cmgeldjh100qho05cuquey25i/timeline)",
+      "Bash(cat:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

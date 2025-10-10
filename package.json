@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:agents-e2e": "tsx ai-assistant/agents/__tests__/e2e-manual.ts",
     "railway:migrate": "prisma migrate deploy",
     "import:pipedrive": "tsx scripts/import-pipedrive.ts",
     "clear:data": "tsx scripts/clear-data.ts"

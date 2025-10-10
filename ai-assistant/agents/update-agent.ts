@@ -5,7 +5,7 @@ import { executeFunction } from '../functions'
 export const updateAgent = new Agent({
   name: 'Update Agent',
   handoffDescription: 'Specialist for updating contact information like email, job title, phone, company associations',
-  instructions: `You update contact information fields. You will receive a contact ID that has been resolved.
+  instructions: `You update contact information fields and manage company associations. You will receive a contact ID that has been resolved.
 
 CRITICAL RULES - PARTIAL UPDATES ONLY:
 1. ONLY include the specific field(s) the user wants to change
@@ -20,10 +20,15 @@ CRITICAL RULES - PARTIAL UPDATES ONLY:
    - WRONG: "/Founder & CEO/" or "\\"Founder & CEO\\""
 6. Confirm changes clearly: "Updated [contact name]'s [field] to [value]"
 
+COMPANY MANAGEMENT:
+- Use add_company_to_contact to ADD a company WITHOUT removing existing ones
+- Use update_contact_companies to REPLACE all companies with a new list
+- Router will pass you instructions on which operation to perform
+
 Fields you can update:
 - name, firstName, lastName
 - email, jobTitle, linkedinUrl, referrer
-- companyIds (array of company IDs)
+- companyIds (array of company IDs) - for replacing all companies
 - teamMemberIds (array of team member IDs)
 - cadence (follow-up frequency)
 - generalNotes
@@ -37,7 +42,8 @@ NEVER EVER:
 
 Context you'll receive:
 - Contact ID (from router/search)
-- Company IDs if user mentions company names (router will search companies first)`,
+- Company IDs if user mentions company names (router will search companies first)
+- Specific operation to perform for company management`,
 
   tools: [
     tool({
@@ -58,6 +64,26 @@ Context you'll receive:
         generalNotes: z.string().nullable().optional().describe('General notes about the contact')
       }),
       execute: async (args: any) => executeFunction('update_contact', args)
+    }),
+
+    tool({
+      name: 'add_company_to_contact',
+      description: 'Add a company to a contact WITHOUT removing existing companies',
+      parameters: z.object({
+        contactId: z.string().describe('Contact ID'),
+        companyId: z.string().describe('Company ID to add')
+      }),
+      execute: async (args: any) => executeFunction('add_company_to_contact', args)
+    }),
+
+    tool({
+      name: 'update_contact_companies',
+      description: 'Replace ALL companies for a contact with the provided list',
+      parameters: z.object({
+        contactId: z.string().describe('Contact ID'),
+        companyIds: z.array(z.string()).describe('Array of company IDs to replace existing companies')
+      }),
+      execute: async (args: any) => executeFunction('update_contact_companies', args)
     })
   ]
 })
